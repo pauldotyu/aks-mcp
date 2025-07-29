@@ -198,15 +198,15 @@ require explicit enablement via `--additional-tools`*
 <details>
 <summary>Real-time Observability</summary>
 
-**Tool:** `inspektor_gadget` *(requires `--additional-tools inspektor-gadget`)*
+**Tool:** `inspektor_gadget_observability`
 
 Real-time observability tool for Azure Kubernetes Service (AKS) clusters using
 eBPF.
 
 **Available Actions:**
 
-- `deploy`: Deploy Inspektor Gadget to cluster
-- `undeploy`: Remove Inspektor Gadget from cluster
+- `deploy`: Deploy Inspektor Gadget to cluster (requires `readwrite`/`admin` access)
+- `undeploy`: Remove Inspektor Gadget from cluster (requires `readwrite`/`admin` access)
 - `is_deployed`: Check deployment status
 - `run`: Run one-shot gadgets
 - `start`: Start continuous gadgets
@@ -407,7 +407,7 @@ Command line arguments:
 ```sh
 Usage of ./aks-mcp:
       --access-level string       Access level (readonly, readwrite, admin) (default "readonly")
-      --additional-tools string   Comma-separated list of additional Kubernetes tools to support (kubectl is always enabled). Available: helm,cilium,inspektor-gadget
+      --additional-tools string   Comma-separated list of additional Kubernetes tools to support (kubectl is always enabled). Available: helm,cilium
       --allow-namespaces string   Comma-separated list of allowed Kubernetes namespaces (empty means all namespaces)
       --host string               Host to listen for the server (only used with transport sse or streamable-http) (default "127.0.0.1")
       --port int                  Port to listen for the server (only used with transport sse or streamable-http) (default 8000)

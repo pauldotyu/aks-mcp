@@ -9,7 +9,7 @@ import "github.com/mark3labs/mcp-go/mcp"
 // RegisterInspektorGadgetTool registers the inspektor-gadget tool to manage gadgets
 func RegisterInspektorGadgetTool() mcp.Tool {
 	return mcp.NewTool(
-		"inspektor_gadget",
+		"inspektor_gadget_observability",
 		mcp.WithDescription("Real-time observability tool for Azure Kubernetes Service (AKS) clusters, allowing users to manage gadgets for monitoring and debugging"),
 		mcp.WithString("action",
 			mcp.Required(),
@@ -56,7 +56,7 @@ func RegisterInspektorGadgetTool() mcp.Tool {
 					map[string]any{
 						"namespace": map[string]any{
 							"type":        "string",
-							"description": "Kubernetes namespace",
+							"description": "Kubernetes namespace, leave empty to use all namespaces",
 						},
 						"pod": map[string]any{
 							"type":        "string",
