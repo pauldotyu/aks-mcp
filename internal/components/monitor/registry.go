@@ -36,8 +36,8 @@ Examples:
 - Resource health: operation="resource_health", subscription_id="<subscription-id>", resource_group="<resource-group>", cluster_name="<cluster-name>", parameters="{\"start_time\":\"2025-01-01T00:00:00Z\"}"
 - App Insights query: operation="app_insights", subscription_id="<subscription-id>", resource_group="<resource-group>", parameters="{\"app_insights_name\":\"...\", \"query\":\"...\"}"
 - Check diagnostics: operation="diagnostics", parameters="{\"subscription_id\":\"<subscription-id>\", \"resource_group\":\"<resource-group>\", \"cluster_name\":\"<cluster-name>\"}"
-- Query AKS control plane logs: operation="control_plane_logs", parameters="{\"log_category\":\"kube-apiserver\", \"start_time\":\"...\", \"end_time\":\"...\"}"
-- Query AKS control plane logs with filters: operation="control_plane_logs", parameters="{\"log_category\":\"kube-apiserver\", \"log_level\":\"error\", \"start_time\":\"...\", \"end_time\":\"...\", \"max_records\":\"50\"}"
+- Query AKS control plane logs: operation="control_plane_logs", parameters="{\"log_category\":\"kube-apiserver\", \"subscription_id\":\"<subscription-id>\", \"resource_group\":\"<resource-group>\", \"cluster_name\":\"<cluster-name>\", \"start_time\":\"<start-time>\", \"end_time\":\"<end-time>\", \"max_records\":\"50\"}"
+- Query AKS control plane logs with filters: operation="control_plane_logs", parameters="{\"log_category\":\"kube-apiserver\", \"log_level\":\"error\", \"subscription_id\":\"<subscription-id>\", \"resource_group\":\"<resource-group>\", \"cluster_name\":\"<cluster-name>\", \"start_time\":\"<start-time>\", \"end_time\":\"<end-time>\", \"max_records\":\"50\"}"
 `
 
 	return mcp.NewTool("az_monitoring",
