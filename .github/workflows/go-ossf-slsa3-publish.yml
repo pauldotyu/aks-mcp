@@ -75,7 +75,7 @@ jobs:
     needs: args
     outputs:
       image: ${{ steps.image.outputs.image }}
-      digest: ${{ steps.build.outputs.digest }}
+      digest: ${{ steps.image.outputs.digest }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
@@ -97,13 +97,30 @@ jobs:
         with:
           images: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
 
-      - name: Build and push Docker image
+      - name: Build and push Linux Docker images
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
-        id: build
+        id: build-linux
         with:
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          file: ./Dockerfile
+          build-args: |
+            VERSION=${{ needs.args.outputs.version }}
+            GIT_COMMIT=${{ needs.args.outputs.commit }}
+            BUILD_DATE=${{ needs.args.outputs.commit-date }}
+            GIT_TREE_STATE=${{ needs.args.outputs.tree-state }}
+
+      - name: Build and push Windows Docker images
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        id: build-windows
+        with:
+          push: true
+          platforms: windows/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          file: ./Dockerfile.windows
           build-args: |
             VERSION=${{ needs.args.outputs.version }}
             GIT_COMMIT=${{ needs.args.outputs.commit }}
@@ -116,6 +133,8 @@ jobs:
           # available to the inputs of a reusable workflow call.
           image_name=$(echo "${IMAGE_REGISTRY}/${IMAGE_NAME}"| tr '[:upper:]' '[:lower:]')
           echo "image=$image_name" >> "$GITHUB_OUTPUT"
+          # Use the Linux build digest for provenance (primary platform)
+          echo "digest=${{ steps.build-linux.outputs.digest }}" >> "$GITHUB_OUTPUT"
   # This step calls the container workflow to generate provenance and push it to
   # the container registry.
   provenance:
