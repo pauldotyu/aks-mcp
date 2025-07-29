@@ -9,7 +9,7 @@ ARG BUILD_DATE
 ARG GIT_TREE_STATE
 
 # Set working directory
-WORKDIR C:\app
+WORKDIR "C:\\app"
 
 # Copy go mod and sum files
 COPY go.mod go.sum ./
@@ -21,28 +21,31 @@ RUN go mod download
 COPY . .
 
 # Build the application for Windows
-RUN go build -o aks-mcp.exe ./cmd/aks-mcp
+RUN go build -trimpath -tags withoutebpf -o aks-mcp.exe ./cmd/aks-mcp
 
 # Runtime stage
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
 # Set working directory
-WORKDIR C:\app
+WORKDIR "C:\\app"
 
-# Install Chocolatey package manager for Windows
-RUN powershell -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))"
+# Use cmd shell
+SHELL ["cmd.exe", "/S", "/C"]
+
+# Download and install Chocolatey using cmd and PowerShell inline
+RUN @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
 
 # Install Azure CLI using Chocolatey
 RUN choco install azure-cli -y
 
 # Copy binary from builder
-COPY --from=builder C:\app\aks-mcp.exe C:\app\aks-mcp.exe
+COPY --from=builder "C:\\app\\aks-mcp.exe" "C:\\app\\aks-mcp.exe"
 
 # Expose the default port for sse/streamable-http transports
 EXPOSE 8000
 
 # Set environment variables
-ENV PATH="C:\app;${PATH}"
+ENV PATH="C:\\app;${PATH}"
 
 # Command to run
 ENTRYPOINT ["C:\\app\\aks-mcp.exe"]
