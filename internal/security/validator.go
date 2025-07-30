@@ -58,6 +58,7 @@ var (
 		"az monitor metrics list-namespaces",
 		"az monitor activity-log list",
 		"az monitor app-insights query",
+		"az monitor log-analytics query",
 
 		// Azure Fleet commands (read-only)
 		"az fleet list",
@@ -133,8 +134,8 @@ func (v *Validator) ValidateCommand(command, commandType string) error {
 
 // validateCommandInjection checks for command injection patterns
 func (v *Validator) validateCommandInjection(command string) error {
-	// Special handling for KQL queries in az monitor log-analytics query commands
-	if strings.Contains(command, "az monitor log-analytics query") && strings.Contains(command, "--analytics-query") {
+	// Special handling for KQL queries in az monitor log-analytics query and app-insights query commands
+	if (strings.Contains(command, "az monitor log-analytics query") || strings.Contains(command, "az monitor app-insights query")) && strings.Contains(command, "--analytics-query") {
 		// For KQL queries, we allow pipes within the quoted analytics-query parameter
 		// but still validate the rest of the command
 		return v.validateKQLCommand(command)
