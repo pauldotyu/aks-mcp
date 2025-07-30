@@ -30,14 +30,14 @@ Supported operations:
 - control_plane_logs: Query AKS control plane logs with safety constraints
 
 Examples:
-- List metrics: operation="metrics", query_type="list", parameters="{\"resource\":\"<aks-cluster-id>\"}"
+- List metrics: operation="metrics", query_type="list", parameters="{\"resource\":\"<aks-cluster-id>\", \"metrics\": \"node_cpu_usage_percentage\", \"aggregation\": \"Average\"}"
 - List metrics definitions: operation="metrics", query_type="list-definitions", parameters="{\"resource\":\"<aks-cluster-id>\"}"
 - List metrics namespaces: operation="metrics", query_type="list-namespaces", parameters="{\"resource\":\"<aks-cluster-id>\"}"
 - Resource health: operation="resource_health", subscription_id="<subscription-id>", resource_group="<resource-group>", cluster_name="<cluster-name>", parameters="{\"start_time\":\"2025-01-01T00:00:00Z\"}"
 - App Insights query: operation="app_insights", subscription_id="<subscription-id>", resource_group="<resource-group>", parameters="{\"app_insights_name\":\"...\", \"query\":\"...\"}"
 - Check diagnostics: operation="diagnostics", parameters="{\"subscription_id\":\"<subscription-id>\", \"resource_group\":\"<resource-group>\", \"cluster_name\":\"<cluster-name>\"}"
-- Query AKS control plane logs: operation="control_plane_logs", parameters="{\"log_category\":\"kube-apiserver\", \"start_time\":\"...\", \"end_time\":\"...\"}"
-- Query AKS control plane logs with filters: operation="control_plane_logs", parameters="{\"log_category\":\"kube-apiserver\", \"log_level\":\"error\", \"start_time\":\"...\", \"end_time\":\"...\", \"max_records\":\"50\"}"
+- Query AKS control plane logs: operation="control_plane_logs", subscription_id="<subscription-id>", resource_group="<resource-group>", cluster_name="<cluster-name>", parameters="{\"log_category\":\"kube-apiserver\", \"start_time\":\"<start-time>\", \"end_time\":\"<end-time>\", \"max_records\":\"50\"}"
+- Query AKS control plane logs with filters: operation="control_plane_logs", subscription_id="<subscription-id>", resource_group="<resource-group>", cluster_name="<cluster-name>", parameters="{\"log_category\":\"kube-apiserver\", \"log_level\":\"error\", \"start_time\":\"<start-time>\", \"end_time\":\"<end-time>\", \"max_records\":\"50\"}"
 `
 
 	return mcp.NewTool("az_monitoring",
