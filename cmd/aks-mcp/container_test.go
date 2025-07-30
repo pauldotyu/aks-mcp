@@ -192,7 +192,7 @@ func TestDockerfileConfiguration(t *testing.T) {
 	content := string(dockerfile)
 
 	// Validate Azure CLI installation
-	if !strings.Contains(content, "pip3 install --break-system-packages azure-cli") {
+	if !strings.Contains(content, "pip3 install --break-system-packages --no-cache-dir azure-cli") {
 		t.Error("Dockerfile missing Azure CLI installation")
 	}
 
