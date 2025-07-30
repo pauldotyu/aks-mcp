@@ -1,0 +1,52 @@
+# Windows Dockerfile for aks-mcp
+# Build stage
+FROM golang:1.24-windowsservercore-ltsc2022 AS builder
+ARG TARGETOS=windows
+ARG TARGETARCH=amd64
+ARG VERSION
+ARG GIT_COMMIT
+ARG BUILD_DATE
+ARG GIT_TREE_STATE
+
+# Set working directory
+WORKDIR "C:\\app"
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the application for Windows
+RUN go build -trimpath -tags withoutebpf -o aks-mcp.exe ./cmd/aks-mcp
+
+# Runtime stage
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+
+# Set working directory
+WORKDIR "C:\\app"
+
+# Use cmd shell
+SHELL ["cmd.exe", "/S", "/C"]
+
+# Download and install Chocolatey using cmd and PowerShell inline
+RUN @"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -InputFormat None -ExecutionPolicy Bypass -Command "[System.Net.ServicePointManager]::SecurityProtocol = 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))" && SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"
+
+# Install Azure CLI using Chocolatey
+RUN choco install azure-cli -y
+
+# Copy binary from builder
+COPY --from=builder "C:\\app\\aks-mcp.exe" "C:\\app\\aks-mcp.exe"
+
+# Expose the default port for sse/streamable-http transports
+EXPOSE 8000
+
+# Set environment variables
+ENV PATH="C:\\app;${PATH}"
+
+# Command to run
+ENTRYPOINT ["C:\\app\\aks-mcp.exe"]
+CMD ["--transport", "streamable-http", "--host", "0.0.0.0"]
