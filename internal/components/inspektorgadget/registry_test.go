@@ -4,8 +4,8 @@ import "testing"
 
 func TestRegisterInspektorGadgetTool(t *testing.T) {
 	tool := RegisterInspektorGadgetTool()
-	if tool.Name != "inspektor_gadget" {
-		t.Errorf("Expected tool name 'inspektor_gadget', got '%s'", tool.Name)
+	if tool.Name != "inspektor_gadget_observability" {
+		t.Errorf("Expected tool name 'inspektor_gadget_observability', got '%s'", tool.Name)
 	}
 
 	if tool.Description == "" {

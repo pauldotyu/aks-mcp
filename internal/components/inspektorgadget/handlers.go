@@ -16,7 +16,13 @@ import (
 // Inspektor Gadget Handler
 // =============================================================================
 
-var ErrNotDeployed = fmt.Errorf("inspektor gadget is not deployed, please deploy it first e.g. using 'inspektor_gadget' (action: deploy) tool (requires 'readwrite' or 'admin' access level)")
+var (
+	defaultHelmCmd    = fmt.Sprintf("helm install %s --namespace=%s --create-namespace %s --version=%s", inspektorGadgetChartRelease, inspektorGadgetChartNamespace, inspektorGadgetChartURL, getChartVersion())
+	defaultKubectlCmd = fmt.Sprintf("kubectl apply -f https://github.com/inspektor-gadget/inspektor-gadget/releases/download/v%s/inspektor-gadget-v%s.yaml", getChartVersion(), getChartVersion())
+)
+
+var ErrNotDeployed = fmt.Errorf("inspektor gadget is not deployed, please deploy it first using: 'inspektor_gadget_observability' tool (action: deploy) (requires 'readwrite' or 'admin' access level)\n"+
+	"or running either of the command manually:\n%s\nor\n%s", defaultHelmCmd, defaultKubectlCmd)
 
 // InspektorGadgetHandler returns a handler to manage gadgets
 func InspektorGadgetHandler(mgr GadgetManager, cfg *config.ConfigData) tools.ResourceHandler {
@@ -219,6 +225,9 @@ func handleLifecycleAction(deployed bool, action string, actionParams map[string
 		return "", fmt.Errorf("namespace %s is not allowed by security policy", inspektorGadgetChartNamespace)
 	}
 	if (cfg.AccessLevel != "readwrite" && cfg.AccessLevel != "admin") && (!slices.Contains(getReadonlyLifecycleActions(), action)) {
+		if action == deployAction {
+			return "", fmt.Errorf("action %q requires 'readwrite' or 'admin' access level, current access level is '%s'. %s", action, cfg.AccessLevel, ErrNotDeployed.Error())
+		}
 		return "", fmt.Errorf("action %q requires 'readwrite' or 'admin' access level, current access level is '%s'", action, cfg.AccessLevel)
 	}
 

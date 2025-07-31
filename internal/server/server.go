@@ -72,6 +72,9 @@ func (s *Service) Initialize() error {
 	// Register Kubernetes tools
 	s.registerKubernetesTools()
 
+	// Register Inspektor Gadget tools for observability
+	s.registerInspektorGadgetTools()
+
 	return nil
 }
 
@@ -234,12 +237,6 @@ func (s *Service) registerKubernetesTools() {
 		ciliumExecutor := k8s.WrapK8sExecutor(cilium.NewExecutor())
 		s.mcpServer.AddTool(ciliumTool, tools.CreateToolHandler(ciliumExecutor, s.cfg))
 	}
-
-	// Register Inspektor Gadget tools for observability
-	if s.cfg.AdditionalTools["inspektor-gadget"] {
-		log.Println("Registering Kubernetes tool: inspektor-gadget")
-		s.registerInspektorGadgetTools()
-	}
 }
 
 // registerKubectlCommands registers kubectl commands based on access level
@@ -271,6 +268,7 @@ func (s *Service) registerInspektorGadgetTools() {
 	}
 
 	// Register Inspektor Gadget tool
+	log.Println("Registering Inspektor Gadget Observability tool: inspektor_gadget_observability")
 	inspektorGadget := inspektorgadget.RegisterInspektorGadgetTool()
 	s.mcpServer.AddTool(inspektorGadget, tools.CreateResourceHandler(inspektorgadget.InspektorGadgetHandler(gadgetMgr, s.cfg), s.cfg))
 }

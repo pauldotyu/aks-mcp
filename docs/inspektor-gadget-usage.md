@@ -1,11 +1,11 @@
-# Inspektor Gadget Tool Usage
+# Inspektor Gadget Observability Tool Usage in AKS-MCP Server
 
-This document gives an overview of `inspektor_gadget` tool in the AKS-MCP server.
+This document gives an overview of `inspektor_gadget_observability` tool in the AKS-MCP server.
 
 ## Tool Overview
 
 The [Inspektor Gadget](https://go.microsoft.com/fwlink/?linkid=2260072) tool allows users to run various diagnostics and inspections on Kubernetes clusters.
-It uses gadgets to collect real-time data with Kubernetes enrichment. `inspektor_gadget` MCP tool essentially allows managing the gadgets, enabling users to 
+It uses gadgets to collect real-time data with Kubernetes enrichment. `inspektor_gadget_observability` MCP tool essentially allows managing the gadgets, enabling users to
 run diagnostics, collect data, and analyze workloads in a Kubernetes environment. It currently supports the following actions:
 
 - **start**: Start a gadget to collect data continuously
@@ -35,7 +35,7 @@ to get the most relevant data for your workload.
 
 ## Sample Prompts
 
-Following are some sample prompts that can be used with to quickly try `inspektor_gadget` tool in the AKS-MCP server:
+Following are some sample prompts that can be used with to quickly try `inspektor_gadget_observability` tool in the AKS-MCP server:
 
 ```
 Can you check if any DNS queries are failing in AKS cluster?
@@ -68,8 +68,7 @@ Can you observe system calls for the pod my-pod in the default namespace for few
 ## Prerequisites
 
 - A kubeconfig file that has access to the AKS cluster. You will need to restart the MCP server if you change the kubeconfig file.
-- Ensure the AKS MCP server is running with the `--additional-tools=inspektor-gadget`.
-- The tool requires Inspektor Gadget to be installed in the cluster. If you are running with `--additional-tools=inspektor-gadget` and `--access-level=readwrite` or more, the MCP server will automatically 
+- The tool requires Inspektor Gadget to be installed in the cluster. If you are running with `--access-level=readwrite` or more, the MCP server will automatically
   install Inspektor Gadget (action `deploy` ) in the cluster otherwise you can follow the steps to install it manually: [Inspektor Gadget Installation](https://learn.microsoft.com/en-us/troubleshoot/azure/azure-kubernetes/logs/capture-system-insights-from-aks#how-to-install-inspektor-gadget-in-an-aks-cluster) or
   use the official Helm chart: [Inspektor Gadget Helm Chart](https://inspektor-gadget.io/docs/latest/reference/install-kubernetes#installation-with-the-helm-chart):
 
@@ -77,3 +76,5 @@ Can you observe system calls for the pod my-pod in the default namespace for few
 IG_VERSION=$(curl -s https://api.github.com/repos/inspektor-gadget/inspektor-gadget/releases/latest | jq -r '.tag_name' | sed 's/^v//')
 helm install gadget --namespace=gadget --create-namespace oci://ghcr.io/inspektor-gadget/inspektor-gadget/charts/gadget --version=$IG_VERSION
 ```
+
+Once Inspektor Gadget is deployed (or you installed it manually), you only need `readonly` (default) access to use the `inspektor_gadget_observability` tool.
