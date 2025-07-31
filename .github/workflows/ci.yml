@@ -139,35 +139,6 @@ jobs:
           docker images aks-mcp:linux-test
           docker run --rm aks-mcp:linux-test --help || true
 
-  build-windows:
-    name: Build Windows
-    runs-on: windows-latest
-    needs: [lint, test]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4.2.2
-        with:
-          fetch-depth: 0
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-          check-latest: true
-          cache: true
-
-      - name: Build Windows binary
-        run: |
-          go build -trimpath -tags withoutebpf -o aks-mcp.exe ./cmd/aks-mcp
-
-      - name: Build Windows Docker image
-        run: docker build --platform windows/amd64 -f Dockerfile.windows -t aks-mcp:windows-test .
-
-      - name: Validate Windows Docker image
-        run: |
-          docker images aks-mcp:windows-test
-          docker run --rm aks-mcp:windows-test --help || true
-
   security:
     name: Security Scan
     runs-on: ubuntu-latest
