@@ -25,13 +25,26 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o aks-mcp ./cm
 
 # Runtime stage
 FROM alpine:3.22
+ARG TARGETARCH
 
 # Install required packages for kubectl and helm, plus build tools for Azure CLI
 RUN apk add --no-cache curl bash openssl ca-certificates git python3 py3-pip \
     gcc python3-dev musl-dev linux-headers
 
+# Install kubectl
+RUN echo $TARGETARCH; curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${TARGETARCH}/kubectl" && \
+    chmod +x kubectl && \
+    mv kubectl /usr/local/bin/kubectl
+
+# Install helm
+RUN HELM_ARCH=${TARGETARCH} && \
+    curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && \
+    chmod 700 get_helm.sh && \
+    VERIFY_CHECKSUM=false ./get_helm.sh && \
+    rm get_helm.sh
+
 # Install Azure CLI
-RUN pip3 install --break-system-packages azure-cli
+RUN pip3 install --break-system-packages --no-cache-dir azure-cli
 
 # Create the mcp user and group
 RUN addgroup -S mcp && \
@@ -52,7 +65,8 @@ EXPOSE 8000
 USER mcp
 
 # Set environment variables
-ENV HOME=/home/mcp
+ENV HOME=/home/mcp \
+    KUBECONFIG=/home/mcp/.kube/config
 
 # Command to run
 ENTRYPOINT ["/usr/local/bin/aks-mcp"]
