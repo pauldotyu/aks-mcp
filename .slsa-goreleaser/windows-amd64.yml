@@ -15,8 +15,9 @@ goarch: amd64
 main: ./cmd/aks-mcp
 
 # (Optional) Go build tags.
-tags:
-  - withoutebpf # need by inspektor-gadget
+flags:
+  - -trimpath
+  - -tags=withoutebpf # need by inspektor-gadget
 
 # (Optional) Working directory. (default: root of the project)
 # dir: ./relative/path/to/dir
