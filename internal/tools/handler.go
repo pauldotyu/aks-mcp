@@ -43,11 +43,11 @@ func CreateToolHandler(executor CommandExecutor, cfg *config.ConfigData) func(ct
 			return mcp.NewToolResultError("arguments must be a map[string]interface{}, got " + fmt.Sprintf("%T", req.Params.Arguments)), nil
 		}
 		result, err := executor.Execute(args, cfg)
-		
+
 		if cfg.Verbose {
 			logToolResult(result, err)
 		}
-		
+
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -68,11 +68,11 @@ func CreateResourceHandler(handler ResourceHandler, cfg *config.ConfigData) func
 			return mcp.NewToolResultError("arguments must be a map[string]interface{}, got " + fmt.Sprintf("%T", req.Params.Arguments)), nil
 		}
 		result, err := handler.Handle(args, cfg)
-		
+
 		if cfg.Verbose {
 			logToolResult(result, err)
 		}
-		
+
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
