@@ -454,7 +454,49 @@ For other MCP-compatible AI clients like [Claude Desktop](https://claude.ai/), c
 }
 ```
 
-#### 🐋 Docker MCP configuration
+#### 🐳 Docker MCP Toolkit
+
+You can enable the [AKS-MCP server directly from MCP Toolkit](https://hub.docker.com/mcp/server/aks/overview):
+
+1. Open Docker Desktop
+2. Click "MCP Toolkit" in the left sidebar
+3. Search for "aks" in Catalog tab
+4. Click on the AKS-MCP server card
+5. Enable the server by clicking "+" in the top right corner
+6. Configure the server using "Configuration" tab:
+   - **azure_dir** `[REQUIRED]`: Path to your Azure credentials directory e.g `/home/user/.azure` (must be absolute – without `$HOME` or `~`)
+   - **kubeconfig** `[REQUIRED]`: Path to your kubeconfig file e.g `/home/user/.kube/config` (must be absolute – without `$HOME` or `~`)
+   - **access_level** `[REQUIRED]`: Set to `readonly`, `readwrite`, or `admin` as needed
+7. You are now ready to use the AKS-MCP server with your [preferred MCP client](https://hub.docker.com/mcp/server/aks/manual), see an example [here](https://docs.docker.com/ai/mcp-catalog-and-toolkit/toolkit/#install-an-mcp-client).
+
+On **Windows**, the Azure credentials won't work by default, but you have two options:
+
+1. **Long-lived servers**: Configure the [MCP gateway](https://docs.docker.com/ai/mcp-gateway/) to use long-lived servers using `--long-lived` flag and then authenticate with Azure CLI in the container, see option B in Containerized MCP configuration below on how to fetch credentials inside the container. 
+2. **Custom Azure Directory**: Set up a custom Azure directory:
+    ```powershell
+    # Set custom Azure config directory
+    $env:AZURE_CONFIG_DIR = "$env:USERPROFILE\.azure-for-docker"
+    
+    # Disable token cache encryption (to match behavior with Linux/macOS)
+    $env:AZURE_CORE_ENCRYPT_TOKEN_CACHE = "false"
+    
+    # Login to Azure CLI
+    az login
+    ```
+
+   This will store the credentials in `$env:USERPROFILE\.azure-for-docker` (e.g. `C:\Users\<username>\.azure-for-docker`),
+   use this path in the AKS-MCP server configuration `azure_dir`.
+
+You can also use the [MCP Gateway](https://docs.docker.com/ai/mcp-gateway/) to enable the AKS-MCP server directly using:
+
+```bash
+# Enable AKS-MCP server in Docker MCP Gateway
+docker mcp server enable aks
+```
+
+Note: You still need to configure the server (e.g. using `docker mcp config`) with your Azure credentials, kubeconfig file, and access level.
+
+#### 🐋 Containerized MCP configuration
 
 For containerized deployment, you can run AKS-MCP server using the official Docker image:
 
