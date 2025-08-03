@@ -28,6 +28,9 @@ type ConfigData struct {
 	AdditionalTools map[string]bool
 	// Comma-separated list of allowed Kubernetes namespaces
 	AllowNamespaces string
+
+	// Verbose logging
+	Verbose bool
 }
 
 // NewConfig creates and returns a new configuration instance
@@ -59,6 +62,9 @@ func (cfg *ConfigData) ParseFlags() {
 		"Comma-separated list of additional Kubernetes tools to support (kubectl is always enabled). Available: helm,cilium")
 	flag.StringVar(&cfg.AllowNamespaces, "allow-namespaces", "",
 		"Comma-separated list of allowed Kubernetes namespaces (empty means all namespaces)")
+
+	// Logging settings
+	flag.BoolVarP(&cfg.Verbose, "verbose", "v", false, "Enable verbose logging")
 
 	flag.Parse()
 
