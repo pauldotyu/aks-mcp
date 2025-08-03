@@ -15,6 +15,13 @@ The AKS-MCP server supports three transport protocols:
 - `aks-mcp-demo.ipynb` - Jupyter notebook demonstration
 - `TRANSPORT_TESTING.md` - Detailed transport testing documentation
 
+## Prerequisites
+
+- Python 3.11+
+- Go 1.21+ (for building the server)
+- Azure CLI (configured with appropriate permissions)
+- Azure OpenAI or OpenAI API access
+
 ## Quick Start
 
 ### 1. Build AKS-MCP Server
@@ -25,9 +32,18 @@ make build
 
 ### 2. Setup Environment
 ```bash
+# Optional: Create virtual environment (recommended)
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install Python dependencies
+pip install semantic-kernel[mcp] python-dotenv
 # Copy and configure environment variables
 cp .env.example .env
-# Edit .env with your Azure OpenAI settings
+# Edit .env with your Azure OpenAI settings:
+# AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+# AZURE_OPENAI_API_KEY=your-api-key
+# AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o
 ```
 
 ### 3. Test Each Transport
@@ -137,9 +153,13 @@ python test_aks_mcp.py --help
 
 ## Jupyter Notebook
 
-Use `aks-mcp-demo.ipynb` for interactive testing:
+Install Jupyter and required dependencies:
 
 ```bash
+# Install Jupyter and notebook dependencies
+pip install jupyter semantic-kernel[mcp] python-dotenv pandas
+
+# Start Jupyter
 jupyter notebook aks-mcp-demo.ipynb
 ```
 
