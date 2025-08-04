@@ -1,6 +1,6 @@
-# AKS MCP Transport Testing Guide
+# AKS MCP Transport Lab Guide
 
-This directory contains tools for testing the AKS-MCP server with different transport protocols and verbose logging capabilities.
+This directory contains tools for lab exercises with the AKS-MCP server using different transport protocols and verbose logging capabilities.
 
 ## Overview
 
@@ -11,9 +11,9 @@ The AKS-MCP server supports three transport protocols:
 
 ## Files
 
-- `test_aks_mcp.py` - Multi-transport test client with comprehensive scenarios
+- `test_aks_mcp.py` - Multi-transport lab client with comprehensive scenarios
 - `aks-mcp-demo.ipynb` - Jupyter notebook demonstration
-- `TRANSPORT_TESTING.md` - Detailed transport testing documentation
+- `TRANSPORT_TESTING.md` - Detailed transport lab documentation
 
 ## Prerequisites
 
@@ -46,11 +46,11 @@ cp .env.example .env
 # AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4o
 ```
 
-### 3. Test Each Transport
+### 3. Lab Exercise: Each Transport
 
 #### STDIO Transport (Default)
 ```bash
-# Test directly - no server needed
+# Lab exercise directly - no server needed
 python test_aks_mcp.py
 ```
 
@@ -59,7 +59,7 @@ python test_aks_mcp.py
 # Terminal 1: Start SSE server with verbose logging
 ./aks-mcp --transport sse --port 8000 --access-level admin --verbose
 
-# Terminal 2: Run test client
+# Terminal 2: Run lab client
 python test_aks_mcp.py --transport sse --host localhost --port 8000
 ```
 
@@ -68,7 +68,7 @@ python test_aks_mcp.py --transport sse --host localhost --port 8000
 # Terminal 1: Start HTTP server with verbose logging  
 ./aks-mcp --transport streamable-http --port 8000 --access-level admin --verbose
 
-# Terminal 2: Run test client
+# Terminal 2: Run lab client
 python test_aks_mcp.py --transport streamable-http --host localhost --port 8000
 ```
 
@@ -89,9 +89,9 @@ Add `--verbose` or `-v` to any server command to see detailed tool call informat
     ERROR: missing or invalid start_time parameter
 ```
 
-## Test Scenarios
+## Lab Scenarios
 
-The test client runs 5 comprehensive scenarios:
+The lab client runs 5 comprehensive scenarios:
 
 1. **Cluster Discovery** - Lists all AKS clusters with health status
 2. **Diagnostic Detectors** - Discovers available diagnostic tools
@@ -115,7 +115,7 @@ The test client runs 5 comprehensive scenarios:
 
 ### Client Commands
 ```bash
-# Test specific transport
+# Lab exercise with specific transport
 python test_aks_mcp.py --transport <stdio|sse|streamable-http>
 
 # Custom host/port for HTTP transports
@@ -167,7 +167,7 @@ The notebook demonstrates the same functionality with step-by-step execution and
 
 ## Performance Tips
 
-- Use `--verbose` only during testing - it generates significant log output
+- Use `--verbose` only during lab exercises - it generates significant log output
 - STDIO transport has the lowest overhead
 - HTTP transports allow multiple concurrent clients
 - Set appropriate `--timeout` values for long-running operations
@@ -175,7 +175,7 @@ The notebook demonstrates the same functionality with step-by-step execution and
 ## Security Notes
 
 - `--access-level admin` provides full cluster access
-- Use `--access-level readonly` for safer testing
+- Use `--access-level readonly` for safer lab exercises
 - Never expose HTTP/SSE servers publicly without proper authentication
 - All transports require valid Azure RBAC permissions
 
