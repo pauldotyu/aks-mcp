@@ -21,13 +21,13 @@ func logToolCall(toolName string, arguments interface{}) {
 }
 
 // logToolResult logs the result or error of a tool call
-func logToolResult(result string, err error) {
+func logToolResult(toolName string, result string, err error) {
 	if err != nil {
-		log.Printf("    ERROR: %v", err)
+		log.Printf("\n<<< [%s] ERROR: %v", toolName, err)
 	} else if len(result) > 500 {
-		log.Printf("    Result: %d bytes (truncated): %.500s...", len(result), result)
+		log.Printf("\n<<< [%s] Result: %d bytes (truncated): %.500s...", toolName, len(result), result)
 	} else {
-		log.Printf("    Result: %s", result)
+		log.Printf("\n<<< [%s] Result: %s", toolName, result)
 	}
 }
 
@@ -45,7 +45,7 @@ func CreateToolHandler(executor CommandExecutor, cfg *config.ConfigData) func(ct
 		result, err := executor.Execute(args, cfg)
 
 		if cfg.Verbose {
-			logToolResult(result, err)
+			logToolResult(req.Params.Name, result, err)
 		}
 
 		if err != nil {
@@ -70,7 +70,7 @@ func CreateResourceHandler(handler ResourceHandler, cfg *config.ConfigData) func
 		result, err := handler.Handle(args, cfg)
 
 		if cfg.Verbose {
-			logToolResult(result, err)
+			logToolResult(req.Params.Name, result, err)
 		}
 
 		if err != nil {
