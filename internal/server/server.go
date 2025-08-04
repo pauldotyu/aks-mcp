@@ -137,6 +137,9 @@ func (s *Service) registerAzureComponents() {
 	// Azure Advisor Component
 	s.registerAdvisorComponent()
 
+	// Register Inspektor Gadget tools for observability
+	s.registerInspektorGadgetComponent()
+
 	log.Println("Azure Components registered successfully")
 }
 
@@ -185,11 +188,8 @@ func (s *Service) registerOptionalKubernetesComponents() {
 	// Register cilium if enabled
 	s.registerCiliumComponent()
 
-	// Register Inspektor Gadget tools for observability
-	s.registerInspektorGadgetIfEnabled()
-
 	// Log if no optional components are enabled
-	if !s.cfg.AdditionalTools["helm"] && !s.cfg.AdditionalTools["cilium"] && !s.cfg.AdditionalTools["inspektor-gadget"] {
+	if !s.cfg.AdditionalTools["helm"] && !s.cfg.AdditionalTools["cilium"] {
 		log.Println("No optional Kubernetes components enabled")
 	}
 }
@@ -321,13 +321,5 @@ func (s *Service) registerCiliumComponent() {
 		ciliumTool := cilium.RegisterCilium()
 		ciliumExecutor := k8s.WrapK8sExecutor(cilium.NewExecutor())
 		s.mcpServer.AddTool(ciliumTool, tools.CreateToolHandler(ciliumExecutor, s.cfg))
-	}
-}
-
-// registerInspektorGadgetIfEnabled registers Inspektor Gadget tools if enabled
-func (s *Service) registerInspektorGadgetIfEnabled() {
-	if s.cfg.AdditionalTools["inspektor-gadget"] {
-		log.Println("Registering Kubernetes tool: inspektor-gadget")
-		s.registerInspektorGadgetComponent()
 	}
 }
