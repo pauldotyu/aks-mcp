@@ -22,7 +22,22 @@ make API calls to Azure and interpret the responses.
 ## Available Tools
 
 The AKS-MCP server provides consolidated tools for interacting with AKS
-clusters. These tools have been designed to provide comprehensive functionality
+clusters. Some tools will require read-write or admin permissions to run debugging pods on your cluster. To enable read-write or admin permissions for the AKS-MCP server, add the **access level** parameter to your MCP configuration file:
+
+1. Navigate to your **mcp.json** file, or go to MCP: List Servers -> AKS-MCP -> Show Configuration Details in the **Command Palette** (`Ctrl+Shift+P` on Windows/Linux or `Cmd+Shift+P` on macOS).
+2. In the "args" section of AKS-MCP, add the following parameters: "--access-level", "readwrite" / "admin"
+
+For example:
+```
+"args": [
+  "--transport",
+  "stdio",
+  "--access-level",
+  "readwrite"
+]
+```
+
+These tools have been designed to provide comprehensive functionality
 through unified interfaces:
 
 <details>
@@ -245,22 +260,22 @@ The easiest way to get started with AKS-MCP is through the **Azure Kubernetes Se
 
 #### Step 1: Install the AKS Extension
 
-1. Open VS Code and go to Extensions (`Ctrl+Shift+X`).
+1. Open VS Code and go to Extensions (`Ctrl+Shift+X` on Windows/Linux or `Cmd+Shift+X` on macOS).
 1. Search for "Azure Kubernetes Service".
 1. Install the official Microsoft AKS extension.
 
-#### Step 2: Launch the AKS MCP Server
+#### Step 2: Launch the AKS-MCP Server
 
-1. Open the **Command Palette** (`Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
-2. Search and run: **AKS: Setup MCP Server**.
+1. Open the **Command Palette** (`Ctrl+Shift+P` on Windows/Linux or `Cmd+Shift+P` on macOS).
+2. Search and run: **AKS: Setup AKS MCP Server**.
 
 Upon successful installation, the server will now be visible in **MCP: List Servers** (via Command Palette). From there, you can start the MCP server or view its status.
 
 #### Step 3: Start Using AKS-MCP
 
-Once started, the MCP server will appear in the **Copilot Chat: Configure Tools** dropdown under `MCP Server: AKS MCP`, ready to enhance contextual prompts based on your AKS environment. By default, all AKS MCP server tools are enabled. You can review the list of available tools and disable any that are not required for your specific scenario.
+Once started, the MCP server will appear in the **Copilot Chat: Configure Tools** dropdown under `MCP Server: AKS-MCP`, ready to enhance contextual prompts based on your AKS environment. By default, all AKS-MCP server tools are enabled. You can review the list of available tools and disable any that are not required for your specific scenario.
 
-Try a prompt like *"List all my AKS clusters"*, which will start using tools from the AKS MCP server.
+Try a prompt like *"List all my AKS clusters"*, which will start using tools from the AKS-MCP server.
 
 > **💡 Benefits**: The AKS extension handles binary downloads, updates, and configuration automatically, ensuring you always have the latest version with optimal settings.
 
