@@ -273,7 +273,7 @@ Upon successful installation, the server will now be visible in **MCP: List Serv
 
 #### Step 3: Start Using AKS-MCP
 
-Once started, the MCP server will appear in the **Copilot Chat: Configure Tools** dropdown under `MCP Server: AKS-MCP`, ready to enhance contextual prompts based on your AKS environment. By default, all AKS-MCP server tools are enabled. You can review the list of available tools and disable any that are not required for your specific scenario.
+Once started, the MCP server will appear in the **Copilot Chat: Configure Tools** dropdown under `MCP Server: AKS MCP`, ready to enhance contextual prompts based on your AKS environment. By default, all AKS-MCP server tools are enabled. You can review the list of available tools and disable any that are not required for your specific scenario.
 
 Try a prompt like *"List all my AKS clusters"*, which will start using tools from the AKS-MCP server.
 
