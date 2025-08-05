@@ -261,7 +261,7 @@ The easiest way to get started with AKS-MCP is through the **Azure Kubernetes Se
 #### Step 1: Install the AKS Extension
 
 1. Open VS Code and go to Extensions (`Ctrl+Shift+X` on Windows/Linux or `Cmd+Shift+X` on macOS).
-1. Search for "Azure Kubernetes Service".
+1. Search for [Azure Kubernetes Service](https://marketplace.visualstudio.com/items?itemName=ms-kubernetes-tools.vscode-aks-tools).
 1. Install the official Microsoft AKS extension.
 
 #### Step 2: Launch the AKS-MCP Server
