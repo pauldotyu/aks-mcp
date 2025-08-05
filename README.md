@@ -237,11 +237,37 @@ eBPF.
    az login
    ```
 
-> **Note**: The AKS-MCP binary will be automatically downloaded when using the 1-Click Installation buttons below.
-
 ### VS Code with GitHub Copilot (Recommended)
 
-#### 🚀 Quick Setup Guide
+#### 🚀 One-Click Installation with the AKS Extension
+
+The easiest way to get started with AKS-MCP is through the **Azure Kubernetes Service Extension for VS Code**.
+
+#### Step 1: Install the AKS Extension
+
+1. Open VS Code and go to Extensions (Ctrl+Shift+X).
+1. Search for "Azure Kubernetes Service".
+1. Install the official Microsoft AKS extension.
+
+#### Step 2: Launch the AKS MCP Server
+
+1. Open the **Command Palette** (`Cmd+Shift+P` on macOS / `Ctrl+Shift+P` on Windows/Linux).
+2. Search and run: **AKS: Setup MCP Server**.
+
+Upon successful installation, the server will now be visible in **MCP: List Servers** (via Command Palette). From there, you can start the MCP server or view its status.
+
+#### Step 3: Start Using AKS-MCP
+
+Once started, the MCP server will appear in the **Copilot Chat: Configure Tools** dropdown under `MCP Server: AKS MCP`, ready to enhance contextual prompts based on your AKS environment. By default, all AKS MCP server tools are enabled. You can review the list of available tools and disable any that are not required for your specific scenario.
+
+Try a prompt like *"List all my AKS clusters"*, which will start using tools from the AKS MCP server.
+
+> **💡 Benefits**: The AKS extension handles binary downloads, updates, and configuration automatically, ensuring you always have the latest version with optimal settings.
+
+### Alternative Installation Methods
+
+<details>
+<summary>Manual Binary Installation</summary>
 
 #### Step 1: Download the Binary
 
@@ -341,7 +367,12 @@ For a persistent configuration that works across all your VS Code workspaces, ad
 
 **Note**: Ensure you have authenticated with Azure CLI (`az login`) for the server to access your Azure resources.
 
+</details>
+
 ### Other MCP-Compatible Clients
+
+<details>
+<summary>Docker and Custom Client Installation</summary>
 
 For other MCP-compatible AI clients like [Claude Desktop](https://claude.ai/), configure the server in your MCP configuration:
 
@@ -358,12 +389,7 @@ For other MCP-compatible AI clients like [Claude Desktop](https://claude.ai/), c
 }
 ```
 
-### ⚙️ Advanced Installation Scenarios (Optional)
-
-<details>
-<summary>Docker containers, custom MCP clients, and manual install options</summary>
-
-### 🐋 Docker Installation
+#### 🐋 Docker Installation
 
 For containerized deployment, you can run AKS-MCP server using the official Docker image:
 
