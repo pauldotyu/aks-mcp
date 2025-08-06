@@ -29,8 +29,8 @@ func (m *MockToolCounter) AddTool(toolName string) {
 	m.toolNames = append(m.toolNames, toolName)
 
 	// Categorize tools
-	azureToolPrefixes := []string{"az_", "azure_", "get_aks_", "list_detectors", "run_detector"}
-	k8sToolPrefixes := []string{"kubectl_", "k8s_", "helm", "cilium", "inspektor"}
+	azureToolPrefixes := []string{"az_", "azure_", "get_aks_", "list_detectors", "run_detector", "inspektor_gadget_observability"}
+	k8sToolPrefixes := []string{"kubectl_", "k8s_", "helm", "cilium"}
 
 	isAzureTool := false
 	for _, prefix := range azureToolPrefixes {
@@ -87,7 +87,7 @@ func TestService(t *testing.T) {
 			name:               "ReadOnly_NoOptional",
 			accessLevel:        "readonly",
 			additionalTools:    map[string]bool{},
-			expectedAzureTools: 7, // AKS Ops + Monitoring + Fleet + Network + Compute (VMSS Info only) + Detectors (3) + Advisor
+			expectedAzureTools: 8, // AKS Ops + Monitoring + Fleet + Network + Compute (VMSS Info only) + Detectors (3) + Advisor + Inspektor Gadget
 			expectedK8sTools:   0, // Will be calculated based on kubectl tools for readonly
 			description:        "Readonly access with no optional tools",
 		},
@@ -95,7 +95,7 @@ func TestService(t *testing.T) {
 			name:               "ReadWrite_NoOptional",
 			accessLevel:        "readwrite",
 			additionalTools:    map[string]bool{},
-			expectedAzureTools: 8, // Same as readonly + 1 read-write VMSS command
+			expectedAzureTools: 9, // Same as readonly + 1 read-write VMSS command
 			expectedK8sTools:   0, // Will be calculated based on kubectl tools for readwrite
 			description:        "Readwrite access with no optional tools",
 		},
@@ -103,7 +103,7 @@ func TestService(t *testing.T) {
 			name:               "Admin_NoOptional",
 			accessLevel:        "admin",
 			additionalTools:    map[string]bool{},
-			expectedAzureTools: 8, // Same as readwrite (no admin VMSS commands currently)
+			expectedAzureTools: 9, // Same as readwrite (no admin VMSS commands currently)
 			expectedK8sTools:   0, // Will be calculated based on kubectl tools for admin
 			description:        "Admin access with no optional tools",
 		},
@@ -111,12 +111,11 @@ func TestService(t *testing.T) {
 			name:        "ReadOnly_AllOptional",
 			accessLevel: "readonly",
 			additionalTools: map[string]bool{
-				"helm":             true,
-				"cilium":           true,
-				"inspektor-gadget": true,
+				"helm":   true,
+				"cilium": true,
 			},
-			expectedAzureTools: 7, // Same as readonly
-			expectedK8sTools:   0, // Will be calculated + 3 optional tools
+			expectedAzureTools: 8, // Same as readonly (Inspektor Gadget now included automatically)
+			expectedK8sTools:   0, // Will be calculated + 2 optional tools
 			description:        "Readonly access with all optional tools",
 		},
 	}
@@ -133,9 +132,6 @@ func TestService(t *testing.T) {
 				optionalToolsCount++
 			}
 			if tt.additionalTools["cilium"] {
-				optionalToolsCount++
-			}
-			if tt.additionalTools["inspektor-gadget"] {
 				optionalToolsCount++
 			}
 
@@ -186,6 +182,7 @@ func TestComponentToolCounts(t *testing.T) {
 			{"Network", 1, "az_network_resources tool"},
 			{"Advisor", 1, "az_advisor_recommendation tool"},
 			{"Detectors", 3, "list_detectors, run_detector, run_detectors_by_category"},
+			{"Inspektor Gadget", 1, "inspektor_gadget_observability tool"},
 		}
 
 		for _, tc := range testCases {
@@ -225,7 +222,7 @@ func TestComponentToolCounts(t *testing.T) {
 		t.Logf("Optional Kubernetes Components:")
 		t.Logf("  - Helm: 1 tool (when enabled)")
 		t.Logf("  - Cilium: 1 tool (when enabled)")
-		t.Logf("  - Inspektor Gadget: 1 tool (when enabled)")
+		t.Logf("Note: Inspektor Gadget is now automatically enabled as part of Azure Components")
 	})
 
 	t.Run("DetectorComponentDetails", func(t *testing.T) {
@@ -272,11 +269,10 @@ func TestServiceInitialization(t *testing.T) {
 	cfg := createTestConfig("readonly", map[string]bool{})
 	service := NewService(cfg)
 
-	// Test service creation
+	// Test service creation and configuration in one block
 	if service == nil {
 		t.Fatal("Service should not be nil")
 	}
-
 	if service.cfg != cfg {
 		t.Error("Service config should match provided config")
 	}
@@ -287,13 +283,11 @@ func TestServiceInitialization(t *testing.T) {
 		t.Fatalf("Initialize should not return error: %v", err)
 	}
 
-	// Test that infrastructure is initialized
-	if service.azClient == nil {
-		t.Error("Azure client should be initialized")
-	}
-
-	if service.mcpServer == nil {
-		t.Error("MCP server should be initialized")
+	// Test that infrastructure is initialized - check both together
+	if service.azClient == nil || service.mcpServer == nil {
+		t.Errorf("Service infrastructure not properly initialized: azClient=%v, mcpServer=%v",
+			service.azClient != nil, service.mcpServer != nil)
+		return
 	}
 
 	t.Logf("Service initialized successfully")
@@ -306,7 +300,7 @@ func TestExpectedToolsByAccessLevel(t *testing.T) {
 	for _, level := range accessLevels {
 		t.Run("AccessLevel_"+level, func(t *testing.T) {
 			// Azure Components (always the same count, but different capabilities)
-			azureToolsCount := 7 // Base count
+			azureToolsCount := 8 // Base count (including Inspektor Gadget)
 
 			// Add compute tools based on access level
 			readWriteVmssCount := len(compute.GetReadWriteVmssCommands())
@@ -336,11 +330,12 @@ func TestExpectedToolsByAccessLevel(t *testing.T) {
 			}
 			t.Logf("  - Detectors: 3")
 			t.Logf("  - Advisor: 1")
+			t.Logf("  - Inspektor Gadget: 1 (automatically enabled)")
 			t.Logf("  Total Azure Tools: %d", azureToolsCount)
 
 			t.Logf("Kubernetes Tools:")
 			t.Logf("  - Kubectl Tools: %d", k8sToolsCount)
-			t.Logf("  - Optional Tools: 0-3 (helm, cilium, inspektor-gadget)")
+			t.Logf("  - Optional Tools: 0-2 (helm, cilium)")
 
 			t.Logf("kubectl tools for %s:", level)
 			for i, tool := range kubectlTools {
