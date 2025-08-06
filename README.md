@@ -278,7 +278,7 @@ Once started, the MCP server will appear in the **Copilot Chat: Configure Tools*
 Try a prompt like *"List all my AKS clusters"*, which will start using tools from the AKS-MCP server.
 
 Note:
-For VS Code that is runing inside of WLS environment, starting AKS MCP server could fail with error "Connection state: Error spawn /home/path/.vs-kubernetes/tools/aks-mcp/v0.0.3/aks-mcp ENOENT", it means VS code cannot find this file. The resolution is modifying the mcp.json file as following to make it running with wls.
+For VS Code that is runing inside of WSL environment, starting AKS MCP server could fail with error "Connection state: Error spawn /home/path/.vs-kubernetes/tools/aks-mcp/v0.0.3/aks-mcp ENOENT", it means VS code cannot find this file. The resolution is modifying the mcp.json file as following to make it running with wsl.
 
 ```json
 "AKS MCP": {
