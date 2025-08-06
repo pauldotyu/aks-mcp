@@ -149,17 +149,21 @@ func TestService(t *testing.T) {
 			// Create service
 			service := NewService(cfg)
 
+			// Verify service was created properly
+			if service == nil { //nolint:staticcheck // False positive: t.Fatal prevents nil dereference
+				t.Fatal("Service should not be nil")
+			}
+
 			// Initialize service (this will register all tools)
-			err := service.Initialize()
-			if err != nil {
+			if err := service.Initialize(); err != nil {
 				t.Fatalf("Failed to initialize service: %v", err)
 			}
 
 			// Verify initialization completed
-			if service.azClient == nil {
+			if service.azClient == nil { //nolint:staticcheck // False positive: service verified non-nil above
 				t.Error("Azure client should be initialized")
 			}
-			if service.mcpServer == nil {
+			if service.mcpServer == nil { //nolint:staticcheck // False positive: service verified non-nil above
 				t.Error("MCP server should be initialized")
 			}
 
@@ -269,25 +273,27 @@ func TestServiceInitialization(t *testing.T) {
 	cfg := createTestConfig("readonly", map[string]bool{})
 	service := NewService(cfg)
 
-	// Test service creation and configuration in one block
-	if service == nil {
+	// Test service creation - must be non-nil
+	if service == nil { //nolint:staticcheck // False positive: t.Fatal prevents nil dereference
 		t.Fatal("Service should not be nil")
 	}
-	if service.cfg != cfg {
+
+	// Test configuration is set correctly
+	if service.cfg != cfg { //nolint:staticcheck // False positive: service verified non-nil above
 		t.Error("Service config should match provided config")
 	}
 
 	// Test initialization
-	err := service.Initialize()
-	if err != nil {
+	if err := service.Initialize(); err != nil {
 		t.Fatalf("Initialize should not return error: %v", err)
 	}
 
-	// Test that infrastructure is initialized - check both together
-	if service.azClient == nil || service.mcpServer == nil {
-		t.Errorf("Service infrastructure not properly initialized: azClient=%v, mcpServer=%v",
-			service.azClient != nil, service.mcpServer != nil)
-		return
+	// Test that infrastructure is initialized
+	if service.azClient == nil { //nolint:staticcheck // False positive: service verified non-nil above
+		t.Error("Azure client should be initialized after Initialize()")
+	}
+	if service.mcpServer == nil { //nolint:staticcheck // False positive: service verified non-nil above
+		t.Error("MCP server should be initialized after Initialize()")
 	}
 
 	t.Logf("Service initialized successfully")
