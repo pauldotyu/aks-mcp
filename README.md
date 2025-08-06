@@ -282,12 +282,12 @@ For VS Code that is runing inside of WLS environment, starting AKS MCP server co
 
 ```json
 "AKS MCP": {
-			"command": "wsl",
-			"args": [
-				"<aks-mcp path>",
-				"--transport",
-				"stdio"
-			]
+	"command": "wsl",
+	"args": [
+		"<aks-mcp path>",
+		"--transport",
+		"stdio"
+	]
 }
 ```
 
