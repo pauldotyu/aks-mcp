@@ -166,7 +166,12 @@ func getSupportedResourceSpecificCategories() []string {
 func (q *KQLQueryBuilder) buildBaseQuery() (string, error) {
 	switch q.tableMode {
 	case ResourceSpecificMode:
-		return fmt.Sprintf("%s | where _ResourceId == '%s'", q.selectedTable, q.processedResourceID), nil
+		baseQuery := fmt.Sprintf("%s | where _ResourceId == '%s'", q.selectedTable, q.processedResourceID)
+		// For AKSControlPlane table, we need to filter by Category since multiple log categories use the same table
+		if q.selectedTable == "AKSControlPlane" {
+			baseQuery += fmt.Sprintf(" | where Category == '%s'", q.category)
+		}
+		return baseQuery, nil
 	case AzureDiagnosticsMode:
 		return fmt.Sprintf("%s | where Category == '%s' and ResourceId == '%s'", q.selectedTable, q.category, q.processedResourceID), nil
 	default:
