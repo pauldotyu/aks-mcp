@@ -129,7 +129,7 @@ docker-build: ## Build Docker image
 .PHONY: docker-run
 docker-run: docker-build ## Run Docker container
 	@echo "==> Running Docker container..."
-	docker run --rm $(DOCKER_IMAGE):$(DOCKER_TAG) --help
+	docker run --rm -p 8000:8000 $(DOCKER_IMAGE):$(DOCKER_TAG)
 
 .PHONY: docker-shell
 docker-shell: docker-build ## Run Docker container with shell access
