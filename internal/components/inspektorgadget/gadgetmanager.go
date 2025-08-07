@@ -15,7 +15,6 @@ import (
 	gadgetcontext "github.com/inspektor-gadget/inspektor-gadget/pkg/gadget-context"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/operators"
 	"github.com/inspektor-gadget/inspektor-gadget/pkg/operators/simple"
-	"github.com/inspektor-gadget/inspektor-gadget/pkg/runtime"
 	grpcruntime "github.com/inspektor-gadget/inspektor-gadget/pkg/runtime/grpc"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -40,8 +39,8 @@ type GadgetManager interface {
 	ListGadgets(ctx context.Context) ([]*GadgetInstance, error)
 	// IsDeployed checks if the Inspektor Gadget is deployed in the environment
 	IsDeployed(ctx context.Context) (bool, string, error)
-	// Close closes the gadget manager and releases any resources
-	Close() error
+	// GetVersion retrieves the of Inpektor Gadget installed in the cluster
+	GetVersion() (string, error)
 }
 
 // GadgetInstance represents a running gadget instance
@@ -60,26 +59,11 @@ func init() {
 }
 
 // NewGadgetManager creates a new instance of GadgetManager
-func NewGadgetManager() (GadgetManager, error) {
-	rt := grpcruntime.New(grpcruntime.WithConnectUsingK8SProxy)
-	if err := rt.Init(nil); err != nil {
-		return nil, fmt.Errorf("initializing gadget runtime: %w", err)
-	}
-
-	restConfig, err := KubernetesFlags.ToRESTConfig()
-	if err != nil {
-		return nil, fmt.Errorf("creating REST config: %w", err)
-	}
-	rt.SetRestConfig(restConfig)
-
-	return &manager{
-		runtime: rt,
-	}, nil
+func NewGadgetManager() GadgetManager {
+	return &manager{}
 }
 
-type manager struct {
-	runtime runtime.Runtime
-}
+type manager struct{}
 
 // RunGadget runs a gadget with the specified image and parameters for a given duration
 func (g *manager) RunGadget(ctx context.Context, image string, params map[string]string, duration time.Duration) (string, error) {
@@ -96,7 +80,12 @@ func (g *manager) RunGadget(ctx context.Context, image string, params map[string
 		gadgetcontext.WithTimeout(duration),
 	)
 
-	if err := g.runtime.RunGadget(gadgetCtx, g.runtime.ParamDescs().ToParams(), params); err != nil {
+	rt, err := getRuntime()
+	if err != nil {
+		return "", fmt.Errorf("getting runtime: %w", err)
+	}
+
+	if err := rt.RunGadget(gadgetCtx, rt.ParamDescs().ToParams(), params); err != nil {
 		return "", fmt.Errorf("running gadget: %w", err)
 	}
 
@@ -155,10 +144,14 @@ func (g *manager) StartGadget(ctx context.Context, image string, params map[stri
 		image,
 	)
 
-	p := g.runtime.ParamDescs().ToParams()
+	rt, err := getRuntime()
+	if err != nil {
+		return "", fmt.Errorf("getting runtime: %w", err)
+	}
+	p := rt.ParamDescs().ToParams()
 
 	newID := make([]byte, 16)
-	_, err := rand.Read(newID)
+	_, err = rand.Read(newID)
 	if err != nil {
 		return "", fmt.Errorf("generating new gadget ID: %w", err)
 	}
@@ -175,7 +168,7 @@ func (g *manager) StartGadget(ctx context.Context, image string, params map[stri
 	if err = p.Set(grpcruntime.ParamTags, strings.Join(append(tags, "createdBy=aks-mcp"), ",")); err != nil {
 		return "", fmt.Errorf("setting gadget tags: %w", err)
 	}
-	if err := g.runtime.RunGadget(gadgetCtx, p, params); err != nil {
+	if err = rt.RunGadget(gadgetCtx, p, params); err != nil {
 		return "", fmt.Errorf("running gadget: %w", err)
 	}
 
@@ -184,7 +177,12 @@ func (g *manager) StartGadget(ctx context.Context, image string, params map[stri
 
 // StopGadget stops a running gadget by its ID
 func (g *manager) StopGadget(ctx context.Context, id string) error {
-	if err := g.runtime.(*grpcruntime.Runtime).RemoveGadgetInstance(ctx, g.runtime.ParamDescs().ToParams(), id); err != nil {
+	rt, err := getRuntime()
+	if err != nil {
+		return fmt.Errorf("getting runtime: %w", err)
+	}
+
+	if err = rt.RemoveGadgetInstance(ctx, rt.ParamDescs().ToParams(), id); err != nil {
 		return fmt.Errorf("stopping to gadget: %w", err)
 	}
 	return nil
@@ -210,7 +208,12 @@ func (g *manager) GetResults(ctx context.Context, id string) (string, error) {
 		gadgetcontext.WithTimeout(time.Second),
 	)
 
-	if err := g.runtime.RunGadget(gadgetCtx, g.runtime.ParamDescs().ToParams(), map[string]string{}); err != nil {
+	rt, err := getRuntime()
+	if err != nil {
+		return "", fmt.Errorf("getting runtime: %w", err)
+	}
+
+	if err = rt.RunGadget(gadgetCtx, rt.ParamDescs().ToParams(), map[string]string{}); err != nil {
 		return "", fmt.Errorf("attaching to gadget: %w", err)
 	}
 
@@ -219,7 +222,12 @@ func (g *manager) GetResults(ctx context.Context, id string) (string, error) {
 
 // ListGadgets lists all running gadgets and returns their instances
 func (g *manager) ListGadgets(ctx context.Context) ([]*GadgetInstance, error) {
-	instances, err := g.runtime.(*grpcruntime.Runtime).GetGadgetInstances(ctx, g.runtime.ParamDescs().ToParams())
+	rt, err := getRuntime()
+	if err != nil {
+		return nil, fmt.Errorf("getting runtime: %w", err)
+	}
+
+	instances, err := rt.GetGadgetInstances(ctx, rt.ParamDescs().ToParams())
 	if err != nil {
 		return nil, fmt.Errorf("listing gadgets: %w", err)
 	}
@@ -267,10 +275,31 @@ func (g *manager) IsDeployed(ctx context.Context) (bool, string, error) {
 	return true, namespaces[0], nil
 }
 
-// Close closes the gadget manager and releases any resources
-func (g *manager) Close() error {
-	if g.runtime != nil {
-		return g.runtime.Close()
+func (g *manager) GetVersion() (string, error) {
+	rt, err := getRuntime()
+	if err != nil {
+		return "", fmt.Errorf("getting runtime: %w", err)
 	}
-	return nil
+
+	info, err := rt.GetInfo()
+	if err != nil {
+		return "", fmt.Errorf("getting info: %w", err)
+	}
+	return info.ServerVersion, nil
+}
+
+// getRuntime sets up a runtime, ensuring we always use the latest kubeconfig
+func getRuntime() (*grpcruntime.Runtime, error) {
+	rt := grpcruntime.New(grpcruntime.WithConnectUsingK8SProxy)
+	if err := rt.Init(nil); err != nil {
+		return nil, fmt.Errorf("initializing gadget runtime: %w", err)
+	}
+
+	restConfig, err := KubernetesFlags.ToRESTConfig()
+	if err != nil {
+		return nil, fmt.Errorf("creating REST config: %w", err)
+	}
+	rt.SetRestConfig(restConfig)
+
+	return rt, nil
 }
