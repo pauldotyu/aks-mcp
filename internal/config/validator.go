@@ -5,7 +5,7 @@ import (
 	"os/exec"
 )
 
-// Validator handles all validation logic for MCP Kubernetes
+// Validator handles all validation logic for AKS MCP
 type Validator struct {
 	// Configuration to validate
 	config *ConfigData

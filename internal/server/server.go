@@ -25,14 +25,14 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// Service represents the MCP Kubernetes service
+// Service represents the AKS MCP service
 type Service struct {
 	cfg       *config.ConfigData
 	mcpServer *server.MCPServer
 	azClient  *azureclient.AzureClient
 }
 
-// NewService creates a new MCP Kubernetes service
+// NewService creates a new AKS MCP service
 func NewService(cfg *config.ConfigData) *Service {
 	return &Service{
 		cfg: cfg,
@@ -89,12 +89,12 @@ func (s *Service) registerAllComponents() {
 
 // Run starts the service with the specified transport
 func (s *Service) Run() error {
-	log.Println("MCP Kubernetes version:", version.GetVersion())
+	log.Println("AKS MCP version:", version.GetVersion())
 
 	// Start the server
 	switch s.cfg.Transport {
 	case "stdio":
-		log.Println("MCP Kubernetes version:", version.GetVersion())
+		log.Println("AKS MCP version:", version.GetVersion())
 		log.Println("Listening for requests on STDIO...")
 		return server.ServeStdio(s.mcpServer)
 	case "sse":
