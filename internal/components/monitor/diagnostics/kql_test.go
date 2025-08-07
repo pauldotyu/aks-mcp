@@ -46,13 +46,13 @@ func TestBuildSafeKQLQuery(t *testing.T) {
 			expectedContains: []string{
 				"AKSControlPlane",
 				"where _ResourceId ==",
+				"where Category == 'kube-apiserver'", // Now includes category filter due to our fix
 				"limit 100",
 				"project TimeGenerated, Category, Level, Message, PodName",
 				"order by TimeGenerated desc",
 			},
 			notExpected: []string{
 				"AzureDiagnostics",
-				"where Category ==",
 			},
 		},
 		{
@@ -289,6 +289,158 @@ func TestBuildSafeKQLQuery(t *testing.T) {
 				"limit 50",
 			},
 		},
+		// Test cases for the AKSControlPlane category filtering fix
+		{
+			name:               "resource-specific guard logs should include category filter for AKSControlPlane",
+			category:           "guard",
+			logLevel:           "",
+			maxRecords:         100,
+			clusterResourceID:  "/subscriptions/test/resourcegroups/rg/providers/microsoft.containerservice/managedclusters/cluster",
+			isResourceSpecific: true,
+			expectedContains: []string{
+				"AKSControlPlane",
+				"where _ResourceId ==",
+				"where Category == 'guard'",
+				"limit 100",
+				"project TimeGenerated, Category, Level, Message, PodName",
+			},
+			notExpected: []string{
+				"AzureDiagnostics",
+			},
+		},
+		{
+			name:               "resource-specific cloud-controller-manager logs should include category filter for AKSControlPlane",
+			category:           "cloud-controller-manager",
+			logLevel:           "info",
+			maxRecords:         50,
+			clusterResourceID:  "/subscriptions/test/resourcegroups/rg/providers/microsoft.containerservice/managedclusters/cluster",
+			isResourceSpecific: true,
+			expectedContains: []string{
+				"AKSControlPlane",
+				"where _ResourceId ==",
+				"where Category == 'cloud-controller-manager'",
+				"where Level == 'INFO'",
+				"limit 50",
+				"project TimeGenerated, Category, Level, Message, PodName",
+			},
+			notExpected: []string{
+				"AzureDiagnostics",
+			},
+		},
+		{
+			name:               "resource-specific kube-controller-manager logs should include category filter for AKSControlPlane",
+			category:           "kube-controller-manager",
+			logLevel:           "warning",
+			maxRecords:         75,
+			clusterResourceID:  "/subscriptions/test/resourcegroups/rg/providers/microsoft.containerservice/managedclusters/cluster",
+			isResourceSpecific: true,
+			expectedContains: []string{
+				"AKSControlPlane",
+				"where _ResourceId ==",
+				"where Category == 'kube-controller-manager'",
+				"where Level == 'WARNING'",
+				"limit 75",
+				"project TimeGenerated, Category, Level, Message, PodName",
+			},
+			notExpected: []string{
+				"AzureDiagnostics",
+			},
+		},
+		{
+			name:               "resource-specific kube-scheduler logs should include category filter for AKSControlPlane",
+			category:           "kube-scheduler",
+			logLevel:           "error",
+			maxRecords:         25,
+			clusterResourceID:  "/subscriptions/test/resourcegroups/rg/providers/microsoft.containerservice/managedclusters/cluster",
+			isResourceSpecific: true,
+			expectedContains: []string{
+				"AKSControlPlane",
+				"where _ResourceId ==",
+				"where Category == 'kube-scheduler'",
+				"where Level == 'ERROR'",
+				"limit 25",
+				"project TimeGenerated, Category, Level, Message, PodName",
+			},
+			notExpected: []string{
+				"AzureDiagnostics",
+			},
+		},
+		{
+			name:               "resource-specific cluster-autoscaler logs should include category filter for AKSControlPlane",
+			category:           "cluster-autoscaler",
+			logLevel:           "",
+			maxRecords:         100,
+			clusterResourceID:  "/subscriptions/test/resourcegroups/rg/providers/microsoft.containerservice/managedclusters/cluster",
+			isResourceSpecific: true,
+			expectedContains: []string{
+				"AKSControlPlane",
+				"where _ResourceId ==",
+				"where Category == 'cluster-autoscaler'",
+				"limit 100",
+				"project TimeGenerated, Category, Level, Message, PodName",
+			},
+			notExpected: []string{
+				"AzureDiagnostics",
+				"where Level ==", // no log level filtering when logLevel is empty
+			},
+		},
+		{
+			name:               "resource-specific CSI controller logs should include category filter for AKSControlPlane",
+			category:           "csi-azuredisk-controller",
+			logLevel:           "info",
+			maxRecords:         200,
+			clusterResourceID:  "/subscriptions/test/resourcegroups/rg/providers/microsoft.containerservice/managedclusters/cluster",
+			isResourceSpecific: true,
+			expectedContains: []string{
+				"AKSControlPlane",
+				"where _ResourceId ==",
+				"where Category == 'csi-azuredisk-controller'",
+				"where Level == 'INFO'",
+				"limit 200",
+				"project TimeGenerated, Category, Level, Message, PodName",
+			},
+			notExpected: []string{
+				"AzureDiagnostics",
+			},
+		},
+		{
+			name:               "resource-specific audit logs should NOT include category filter (different table)",
+			category:           "kube-audit",
+			logLevel:           "",
+			maxRecords:         100,
+			clusterResourceID:  "/subscriptions/test/resourcegroups/rg/providers/microsoft.containerservice/managedclusters/cluster",
+			isResourceSpecific: true,
+			expectedContains: []string{
+				"AKSAudit",
+				"where _ResourceId ==",
+				"limit 100",
+				"project TimeGenerated, Level, AuditId, Stage, RequestUri, Verb, User",
+			},
+			notExpected: []string{
+				"where Category ==", // Should NOT have category filter since it's in AKSAudit table
+				"AKSControlPlane",
+				"AzureDiagnostics",
+			},
+		},
+		{
+			name:               "resource-specific audit-admin logs should NOT include category filter (different table)",
+			category:           "kube-audit-admin",
+			logLevel:           "",
+			maxRecords:         150,
+			clusterResourceID:  "/subscriptions/test/resourcegroups/rg/providers/microsoft.containerservice/managedclusters/cluster",
+			isResourceSpecific: true,
+			expectedContains: []string{
+				"AKSAuditAdmin",
+				"where _ResourceId ==",
+				"limit 150",
+				"project TimeGenerated, Level, AuditId, Stage, RequestUri, Verb, User",
+			},
+			notExpected: []string{
+				"where Category ==", // Should NOT have category filter since it's in AKSAuditAdmin table
+				"AKSControlPlane",
+				"AzureDiagnostics",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -330,6 +482,169 @@ func TestBuildSafeKQLQuery(t *testing.T) {
 
 			if !strings.Contains(query, "order by TimeGenerated desc") {
 				t.Errorf("Query should contain ordering clause, got: %s", query)
+			}
+		})
+	}
+}
+
+// TestAKSControlPlaneCategoryFiltering specifically tests the fix for category filtering
+// in AKSControlPlane table to ensure different log categories don't return each other's logs
+func TestAKSControlPlaneCategoryFiltering(t *testing.T) {
+	testResourceID := "/subscriptions/test/resourcegroups/rg/providers/microsoft.containerservice/managedclusters/cluster"
+
+	// Test all AKSControlPlane categories to ensure they each get proper category filtering
+	controlPlaneCategories := []string{
+		"kube-apiserver",
+		"kube-controller-manager",
+		"kube-scheduler",
+		"cluster-autoscaler",
+		"cloud-controller-manager",
+		"guard",
+		"csi-azuredisk-controller",
+		"csi-azurefile-controller",
+		"csi-snapshot-controller",
+	}
+
+	for _, category := range controlPlaneCategories {
+		t.Run(fmt.Sprintf("resource-specific_%s_has_category_filter", category), func(t *testing.T) {
+			query, err := BuildSafeKQLQuery(category, "", 100, testResourceID, true)
+			if err != nil {
+				t.Fatalf("BuildSafeKQLQuery failed for category %s: %v", category, err)
+			}
+
+			// Should use AKSControlPlane table
+			if !strings.HasPrefix(query, "AKSControlPlane") {
+				t.Errorf("Expected query to start with 'AKSControlPlane' for category %s, got: %s", category, query)
+			}
+
+			// Should include category filter to prevent cross-contamination
+			expectedCategoryFilter := fmt.Sprintf("where Category == '%s'", category)
+			if !strings.Contains(query, expectedCategoryFilter) {
+				t.Errorf("Expected query to contain category filter '%s' for category %s, got: %s", expectedCategoryFilter, category, query)
+			}
+
+			// Should include resource ID filter
+			if !strings.Contains(query, "where _ResourceId ==") {
+				t.Errorf("Expected query to contain resource ID filter for category %s, got: %s", category, query)
+			}
+
+			// Should NOT contain other categories
+			for _, otherCategory := range controlPlaneCategories {
+				if otherCategory != category {
+					wrongCategoryFilter := fmt.Sprintf("where Category == '%s'", otherCategory)
+					if strings.Contains(query, wrongCategoryFilter) {
+						t.Errorf("Query for category %s should NOT contain filter for other category %s, got: %s", category, otherCategory, query)
+					}
+				}
+			}
+		})
+	}
+
+	// Test that audit tables don't get category filtering (they have dedicated tables)
+	auditCategories := []string{"kube-audit", "kube-audit-admin"}
+
+	for _, category := range auditCategories {
+		t.Run(fmt.Sprintf("resource-specific_%s_no_category_filter", category), func(t *testing.T) {
+			query, err := BuildSafeKQLQuery(category, "", 100, testResourceID, true)
+			if err != nil {
+				t.Fatalf("BuildSafeKQLQuery failed for audit category %s: %v", category, err)
+			}
+
+			// Should NOT contain category filter since audit logs have dedicated tables
+			if strings.Contains(query, "where Category ==") {
+				t.Errorf("Audit category %s should NOT have category filter (has dedicated table), got: %s", category, query)
+			}
+
+			// Should use appropriate audit table
+			if category == "kube-audit" && !strings.HasPrefix(query, "AKSAudit") {
+				t.Errorf("Expected kube-audit query to start with 'AKSAudit', got: %s", query)
+			}
+			if category == "kube-audit-admin" && !strings.HasPrefix(query, "AKSAuditAdmin") {
+				t.Errorf("Expected kube-audit-admin query to start with 'AKSAuditAdmin', got: %s", query)
+			}
+		})
+	}
+}
+
+// TestCategoryFilteringPreventsCrossContamination tests that the fix prevents
+// different categories from returning each other's logs (the original bug)
+func TestCategoryFilteringPreventsCrossContamination(t *testing.T) {
+	testResourceID := "/subscriptions/test/resourcegroups/rg/providers/microsoft.containerservice/managedclusters/cluster"
+
+	// Test the specific case that was broken: guard logs returning cloud-controller-manager logs
+	guardQuery, err := BuildSafeKQLQuery("guard", "", 100, testResourceID, true)
+	if err != nil {
+		t.Fatalf("BuildSafeKQLQuery failed for guard: %v", err)
+	}
+
+	cloudControllerQuery, err := BuildSafeKQLQuery("cloud-controller-manager", "", 100, testResourceID, true)
+	if err != nil {
+		t.Fatalf("BuildSafeKQLQuery failed for cloud-controller-manager: %v", err)
+	}
+
+	// Guard query should filter for guard category only
+	if !strings.Contains(guardQuery, "where Category == 'guard'") {
+		t.Errorf("Guard query should contain guard category filter, got: %s", guardQuery)
+	}
+	if strings.Contains(guardQuery, "where Category == 'cloud-controller-manager'") {
+		t.Errorf("Guard query should NOT contain cloud-controller-manager category filter, got: %s", guardQuery)
+	}
+
+	// Cloud controller query should filter for cloud-controller-manager category only
+	if !strings.Contains(cloudControllerQuery, "where Category == 'cloud-controller-manager'") {
+		t.Errorf("Cloud controller query should contain cloud-controller-manager category filter, got: %s", cloudControllerQuery)
+	}
+	if strings.Contains(cloudControllerQuery, "where Category == 'guard'") {
+		t.Errorf("Cloud controller query should NOT contain guard category filter, got: %s", cloudControllerQuery)
+	}
+
+	// Queries should be different (each has its own category filter)
+	if guardQuery == cloudControllerQuery {
+		t.Errorf("Guard and cloud-controller-manager queries should be different, but they are identical: %s", guardQuery)
+	}
+
+	// Test a few more combinations to ensure proper isolation
+	testCases := []struct {
+		category1 string
+		category2 string
+	}{
+		{"kube-apiserver", "kube-scheduler"},
+		{"kube-controller-manager", "cluster-autoscaler"},
+		{"guard", "kube-apiserver"},
+		{"csi-azuredisk-controller", "csi-azurefile-controller"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%s_vs_%s", tc.category1, tc.category2), func(t *testing.T) {
+			query1, err := BuildSafeKQLQuery(tc.category1, "", 100, testResourceID, true)
+			if err != nil {
+				t.Fatalf("BuildSafeKQLQuery failed for %s: %v", tc.category1, err)
+			}
+
+			query2, err := BuildSafeKQLQuery(tc.category2, "", 100, testResourceID, true)
+			if err != nil {
+				t.Fatalf("BuildSafeKQLQuery failed for %s: %v", tc.category2, err)
+			}
+
+			// Each query should have its own category filter
+			expectedFilter1 := fmt.Sprintf("where Category == '%s'", tc.category1)
+			expectedFilter2 := fmt.Sprintf("where Category == '%s'", tc.category2)
+
+			if !strings.Contains(query1, expectedFilter1) {
+				t.Errorf("Query for %s should contain its own category filter '%s', got: %s", tc.category1, expectedFilter1, query1)
+			}
+
+			if !strings.Contains(query2, expectedFilter2) {
+				t.Errorf("Query for %s should contain its own category filter '%s', got: %s", tc.category2, expectedFilter2, query2)
+			}
+
+			// Each query should NOT contain the other's category filter
+			if strings.Contains(query1, expectedFilter2) {
+				t.Errorf("Query for %s should NOT contain filter for %s, got: %s", tc.category1, tc.category2, query1)
+			}
+
+			if strings.Contains(query2, expectedFilter1) {
+				t.Errorf("Query for %s should NOT contain filter for %s, got: %s", tc.category2, tc.category1, query2)
 			}
 		})
 	}
@@ -636,9 +951,19 @@ func TestBuildSafeKQLQueryResourceSpecificMode(t *testing.T) {
 				if !strings.Contains(query, "_ResourceId ==") {
 					t.Errorf("Expected resource-specific query to use '_ResourceId ==', but it didn't. Query: %s", query)
 				}
-				// Should NOT contain Category filter
-				if strings.Contains(query, "where Category ==") {
-					t.Errorf("Expected resource-specific query NOT to contain 'where Category ==', but it did. Query: %s", query)
+
+				// AKSControlPlane table should have category filter to prevent cross-contamination
+				// AKSAudit and AKSAuditAdmin tables should NOT have category filter (dedicated tables)
+				if tt.expectedTable == "AKSControlPlane" {
+					expectedCategoryFilter := fmt.Sprintf("where Category == '%s'", tt.category)
+					if !strings.Contains(query, expectedCategoryFilter) {
+						t.Errorf("Expected AKSControlPlane query to contain category filter '%s', but it didn't. Query: %s", expectedCategoryFilter, query)
+					}
+				} else {
+					// For audit tables (AKSAudit, AKSAuditAdmin), should NOT contain category filter
+					if strings.Contains(query, "where Category ==") {
+						t.Errorf("Expected %s query NOT to contain 'where Category ==', but it did. Query: %s", tt.expectedTable, query)
+					}
 				}
 			}
 		})
