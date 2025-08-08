@@ -306,7 +306,7 @@ func handleUpgradeAction(actionParams map[string]interface{}, cfg *config.Config
 		return "", fmt.Errorf("getting helm release %s: %w", inspektorGadgetChartRelease, err)
 	}
 	if strings.Contains(out, "release: not found") {
-		return "", fmt.Errorf("helm release not found, cannot upgrade. Did you manually deploy Inspektor Gadget")
+		return "", fmt.Errorf("helm release not found, cannot upgrade. Did you manually deploy Inspektor Gadget?")
 	}
 	// Proceed with upgrade if the release exists
 	chartVersion, ok := actionParams["chart_version"].(string)
