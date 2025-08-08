@@ -87,7 +87,7 @@ Unified tool for getting Azure network resource information used by AKS clusters
 
 - `all`: Get information about all network resources
 - `vnet`: Virtual Network information
-- `subnet`: Subnet information  
+- `subnet`: Subnet information
 - `nsg`: Network Security Group information
 - `route_table`: Route Table information
 - `load_balancer`: Load Balancer information
@@ -331,7 +331,7 @@ mkdir -p .vscode ; Invoke-WebRequest -Uri "https://github.com/Azure/aks-mcp/rele
 *macOS/Linux (Bash):*
 
 ```bash
-# Download binary and create VS Code configuration  
+# Download binary and create VS Code configuration
 mkdir -p .vscode && curl -sL https://github.com/Azure/aks-mcp/releases/latest/download/aks-mcp-linux-amd64 -o aks-mcp && chmod +x aks-mcp && echo '{"servers":{"aks-mcp-server":{"type":"stdio","command":"'$PWD'/aks-mcp","args":["--transport","stdio"]}}}' > .vscode/mcp.json
 ```
 
@@ -419,19 +419,66 @@ For other MCP-compatible AI clients like [Claude Desktop](https://claude.ai/), c
 }
 ```
 
-#### 🐋 Docker Installation
+#### 🐋 Docker MCP configuration
 
 For containerized deployment, you can run AKS-MCP server using the official Docker image:
 
-```bash
-# Pull the latest official image
-docker pull ghcr.io/azure/aks-mcp:latest
+Option A: Mount credentials from host (recommended):
 
-# Run with Azure CLI authentication (recommended)
-docker run -i --rm ghcr.io/azure/aks-mcp:latest --transport stdio
+```json
+{
+  "mcpServers": {
+    "aks": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+          "run",
+          "-i",
+          "--rm",
+          "--user",
+          "<your-user-id (e.g. id -u)>",
+          "-v",
+          "~/.azure:/home/mcp/.azure",
+          "-v",
+          "~/.kube:/home/mcp/.kube",
+          "ghcr.io/azure/aks-mcp:latest",
+          "--transport",
+          "stdio"
+        ]
+    }
+  }
+}
 ```
 
-> **Note**: Ensure you have authenticated with Azure CLI (`az login`) on your host system before running the container.
+Option B: fetch the credentials inside the container:
+
+```json
+{
+  "mcpServers": {
+    "aks": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+          "run",
+          "-i",
+          "--rm",
+          "ghcr.io/azure/aks-mcp:latest",
+          "--transport",
+          "stdio"
+        ]
+    }
+  }
+}
+```
+
+Start the MCP server container first per above command, and then run the following commands to fetch the credentials:
+- Login to Azure CLI: `docker exec -it <container-id> az login --use-device-code`
+- Get kubeconfig: `docker exec -it <container-id> az aks get-credentials -g <resource-group> -n <cluster-name>`
+
+Note that:
+
+- Host Azure CLI logins don’t automatically propagate into containers without mounting `~/.azure`.
+- User ID should be set for option A, orelse the mcp user inside container won't be able to access the mounted files.
 
 ### 🤖 Custom MCP Client Installation
 
