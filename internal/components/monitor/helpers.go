@@ -5,21 +5,20 @@ import (
 	"slices"
 )
 
+// supportedMonitoringOperations defines all supported monitoring operations
+var supportedMonitoringOperations = []string{
+	string(OpMetrics), string(OpResourceHealth), string(OpAppInsights),
+	string(OpDiagnostics), string(OpControlPlaneLogs),
+}
+
 // ValidateMonitoringOperation checks if the monitoring operation is supported
 func ValidateMonitoringOperation(operation string) bool {
-	supportedOps := []string{
-		string(OpMetrics), string(OpResourceHealth), string(OpAppInsights),
-		string(OpDiagnostics), string(OpControlPlaneLogs),
-	}
-	return slices.Contains(supportedOps, operation)
+	return slices.Contains(supportedMonitoringOperations, operation)
 }
 
 // GetSupportedMonitoringOperations returns all supported monitoring operations
 func GetSupportedMonitoringOperations() []string {
-	return []string{
-		string(OpMetrics), string(OpResourceHealth), string(OpAppInsights),
-		string(OpDiagnostics), string(OpControlPlaneLogs),
-	}
+	return supportedMonitoringOperations
 }
 
 // ValidateMetricsQueryType checks if the metrics query type is supported
@@ -38,7 +37,7 @@ func MapMetricsQueryTypeToCommand(queryType string) (string, error) {
 
 	cmd, exists := commandMap[queryType]
 	if !exists {
-		return "", fmt.Errorf("no command mapping for metrics query type: %s", queryType)
+		return "", fmt.Errorf("unsupported metrics query type '%s'. Supported types: list, list-definitions, list-namespaces", queryType)
 	}
 
 	return cmd, nil

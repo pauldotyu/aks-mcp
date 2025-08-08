@@ -19,9 +19,9 @@ const (
 func RegisterAzMonitoring() mcp.Tool {
 	description := `Unified tool for Azure monitoring and diagnostics operations for AKS clusters.
 
-SUPPORTED OPERATIONS:
+Supported Operations:
 
-1. METRICS - Query Azure Monitor metrics for AKS clusters and nodes
+1. Metrics - Query Azure Monitor metrics for AKS clusters and nodes
    - list: Get metric values for specific metrics
    - list-definitions: Get available metrics for a resource
    - list-namespaces: Get metric namespaces for a resource
@@ -31,22 +31,22 @@ SUPPORTED OPERATIONS:
    Additional for 'list': metrics (metric names)
    Optional: aggregation, start-time, end-time, interval, filter
 
-2. RESOURCE_HEALTH - Get Azure Resource Health events for AKS clusters
+2. Resource Health - Get Azure Resource Health events for AKS clusters
    Use for: Cluster availability issues, platform problems, service health events
    Required parameters: subscription_id, resource_group, cluster_name, start_time
    Optional: end_time, status (Available, Unavailable, Degraded, Unknown)
 
-3. APP_INSIGHTS - Execute KQL queries against Application Insights telemetry
+3. Application Insights - Execute KQL queries against Application Insights telemetry
    Use for: Application performance monitoring, custom telemetry analysis, trace correlation
    Required parameters: subscription_id, resource_group, app_insights_name, query
    Optional: start_time + end_time OR timespan (not both)
 
-4. DIAGNOSTICS - Check AKS cluster diagnostic settings configuration
+4. Diagnostics - Check AKS cluster diagnostic settings configuration
    Use for: Verify logging is enabled, check log retention, validate diagnostic configuration
    Required parameters: subscription_id, resource_group, cluster_name
 
-5. CONTROL_PLANE_LOGS - Query AKS control plane logs
-   SUPPORTED LOG CATEGORIES:
+5. Control Plane Logs - Query AKS control plane logs
+   Supported log categories:
    - kube-apiserver
    - kube-audit
    - kube-audit-admin
@@ -63,7 +63,7 @@ SUPPORTED OPERATIONS:
    - fleet-mcs-controller-manager
    PLEASE NOTE: you need to check if the category is enabled in your cluster's diagnostic settings by using the diagnostics tool.
 
-USE THIS TOOL WHEN YOU NEED TO:
+Use This Tool When You Need To:
 - Monitor cluster or other azure resource performance and usage (use metrics)
 - Check cluster availability and platform health (use resource_health)
 - Analyze application telemetry and performance (use app_insights)
@@ -75,24 +75,24 @@ USE THIS TOOL WHEN YOU NEED TO:
 - Analyze cluster scaling behavior (use control_plane_logs with cluster-autoscaler)
 - Review security audit events (use control_plane_logs with kube-audit, kube-audit-admin)
 
-DETAILED EXAMPLES:
+Examples:
 
-METRICS EXAMPLES:
+metrics:
 - Get CPU usage: operation="metrics", query_type="list", parameters="{\"resource\":\"/subscriptions/sub-id/resourceGroups/rg/providers/Microsoft.ContainerService/managedClusters/cluster\", \"metrics\":\"node_cpu_usage_percentage\", \"aggregation\":\"Average\", \"start-time\":\"<start-time>\", \"end-time\":\"<end-time>\"}"
 - List available metrics: operation="metrics", query_type="list-definitions", parameters="{\"resource\":\"/subscriptions/sub-id/resourceGroups/rg/providers/Microsoft.ContainerService/managedClusters/cluster\"}"
 
-RESOURCE HEALTH EXAMPLES:
+resource_health:
 - Check recent cluster health: operation="resource_health", subscription_id="<subscription-id>", resource_group="<resource-group>", cluster_name="<cluster-name>", parameters="{\"start_time\":\"<start-time>\"}"
 
-APPLICATION INSIGHTS EXAMPLES:
+app_insights:
 - Query request telemetry: operation="app_insights", subscription_id="<subscription-id>", resource_group="<resource-group>", parameters="{\"app_insights_name\":\"myapp-insights\", \"query\":\"requests | where timestamp > ago(1h) | summarize count() by bin(timestamp, 5m)\"}"
 - Analyze exceptions: operation="app_insights", subscription_id="<subscription-id>", resource_group="<resource-group>", parameters="{\"app_insights_name\":\"myapp-insights\", \"query\":\"exceptions | where timestamp > ago(24h) | summarize count() by type, bin(timestamp, 1h)\"}"
 - Performance with timespan: operation="app_insights", subscription_id="<subscription-id>", resource_group="<resource-group>", parameters="{\"app_insights_name\":\"myapp-insights\", \"query\":\"performanceCounters | where category == 'Processor' | summarize avg(value) by bin(timestamp, 5m)\", \"timespan\":\"PT1H\"}"
 
-DIAGNOSTICS EXAMPLES:
+diagnostics:
 - Verify diagnostic settings: operation="diagnostics", subscription_id="<subscription-id>", resource_group="<resource-group>", cluster_name="<cluster-name>", parameters="{}"
 
-CONTROL PLANE LOGS EXAMPLES:
+control_plane_logs:
 - Query API server logs: operation="control_plane_logs", subscription_id="<subscription-id>", resource_group="<resource-group>", cluster_name="<cluster-name>", parameters="{\"log_category\":\"kube-apiserver\", \"start_time\":\"<start-time>\", \"end_time\":\"<end-time>\", \"max_records\":\"50\"}"
 - Debug authentication issues: operation="control_plane_logs", subscription_id="<subscription-id>", resource_group="<resource-group>", cluster_name="<cluster-name>", parameters="{\"log_category\":\"guard\", \"start_time\":\"<start-time>\", \"end_time\":\"<end-time>\", \"max_records\":\"100\"}"
 - Analyze audit events: operation="control_plane_logs", subscription_id="<subscription-id>", resource_group="<resource-group>", cluster_name="<cluster-name>", parameters="{\"log_category\":\"kube-audit\", \"log_level\":\"error\", \"start_time\":\"<start-time>\", \"end_time\":\"<end-time>\", \"max_records\":\"50\"}"
@@ -109,7 +109,7 @@ CONTROL PLANE LOGS EXAMPLES:
 		),
 		mcp.WithString("parameters",
 			mcp.Required(),
-			mcp.Description("JSON string with operation parameters. METRICS: resource (required), metrics (required for 'list' query_type), aggregation/start-time/end-time/interval/filter (optional). RESOURCE_HEALTH: start_time, end_time, status. APP_INSIGHTS: app_insights_name, query, start_time/end_time OR timespan (optional). DIAGNOSTICS: none required. CONTROL_PLANE_LOGS: log_category (kube-apiserver/kube-audit/guard/etc), start_time, end_time, max_records, log_level"),
+			mcp.Description("JSON string with operation parameters. metrics: resource (required), metrics (required for 'list' query_type), aggregation/start-time/end-time/interval/filter (optional). resource_health: start_time, end_time, status. app_insights: app_insights_name, query, start_time/end_time OR timespan (optional). diagnostics: none required. control_plane_logs: log_category (kube-apiserver/kube-audit/guard/etc), start_time, end_time, max_records, log_level"),
 		),
 		mcp.WithString("subscription_id",
 			mcp.Description("Azure subscription ID (required for resource_health, app_insights, diagnostics, control_plane_logs)"),
