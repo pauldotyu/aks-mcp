@@ -2,11 +2,9 @@ package azaks
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/Azure/aks-mcp/internal/command"
+	"github.com/Azure/aks-mcp/internal/azcli"
 	"github.com/Azure/aks-mcp/internal/config"
-	"github.com/Azure/aks-mcp/internal/security"
 )
 
 // AksOperationsExecutor handles execution of AKS operations
@@ -48,36 +46,9 @@ func (e *AksOperationsExecutor) Execute(params map[string]interface{}, cfg *conf
 		fullCommand += " " + args
 	}
 
-	// Validate the command against security settings
-	validator := security.NewValidator(cfg.SecurityConfig)
-	err = validator.ValidateCommand(fullCommand, security.CommandTypeAz)
-	if err != nil {
-		return "", err
-	}
-
-	// Extract binary name and arguments from command
-	cmdParts := strings.Fields(fullCommand)
-	if len(cmdParts) == 0 {
-		return "", fmt.Errorf("empty command")
-	}
-
-	// Use the first part as the binary name
-	binaryName := cmdParts[0]
-
-	// The rest of the command becomes the arguments
-	cmdArgs := ""
-	if len(cmdParts) > 1 {
-		cmdArgs = strings.Join(cmdParts[1:], " ")
-	}
-
-	// If the command is not an az command, return an error
-	if binaryName != "az" {
-		return "", fmt.Errorf("command must start with 'az'")
-	}
-
-	// Execute the command
-	process := command.NewShellProcess(binaryName, cfg.Timeout)
-	return process.Run(cmdArgs)
+	// Delegate execution to the shared az executor (handles validation and auto-login)
+	exec := azcli.NewExecutor()
+	return exec.Execute(map[string]interface{}{"command": fullCommand}, cfg)
 }
 
 // ExecuteSpecificCommand executes a specific operation with the given arguments (for backward compatibility)
