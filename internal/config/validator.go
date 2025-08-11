@@ -37,6 +37,24 @@ func (v *Validator) validateCli() bool {
 		valid = false
 	}
 
+	// kubectl is always required (core Kubernetes functionality)
+	if !v.isCliInstalled("kubectl") {
+		v.errors = append(v.errors, "kubectl is not installed or not found in PATH")
+		valid = false
+	}
+
+	// helm is required for Inspektor Gadget component and when explicitly enabled
+	if !v.isCliInstalled("helm") {
+		v.errors = append(v.errors, "helm is not installed or not found in PATH (required for Inspektor Gadget observability)")
+		valid = false
+	}
+
+	// cilium is optional - only validate if explicitly enabled
+	if v.config.AdditionalTools["cilium"] && !v.isCliInstalled("cilium") {
+		v.errors = append(v.errors, "cilium is not installed or not found in PATH (required when --additional-tools includes cilium)")
+		valid = false
+	}
+
 	return valid
 }
 
