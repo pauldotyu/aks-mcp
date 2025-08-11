@@ -513,9 +513,11 @@ Usage of ./aks-mcp:
       --additional-tools string   Comma-separated list of additional Kubernetes tools to support (kubectl is always enabled). Available: helm,cilium
       --allow-namespaces string   Comma-separated list of allowed Kubernetes namespaces (empty means all namespaces)
       --host string               Host to listen for the server (only used with transport sse or streamable-http) (default "127.0.0.1")
+      --otlp-endpoint string      OTLP endpoint for OpenTelemetry traces (e.g. localhost:4317, default "")
       --port int                  Port to listen for the server (only used with transport sse or streamable-http) (default 8000)
       --timeout int               Timeout for command execution in seconds, default is 600s (default 600)
       --transport string          Transport mechanism to use (stdio, sse or streamable-http) (default "stdio")
+  -v, --verbose                   Enable verbose logging
 ```
 
 **Environment variables:**
@@ -603,6 +605,12 @@ Create a placement to deploy nginx workloads to clusters with app=frontend label
 
 Show me all ClusterResourcePlacements in my fleet.
 ```
+
+## Telemetry
+
+Telemetry collection is on by default.
+
+To opt out, set the environment variable `AKS_MCP_COLLECT_TELEMETRY=false`.
 
 ## Contributing
 
