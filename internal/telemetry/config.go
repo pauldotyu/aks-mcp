@@ -88,7 +88,7 @@ func (c *Config) HasOTLP() bool {
 	return c.OTLPEndpoint != ""
 }
 
-// HasApplicationInsights returns whether application insinghts export is configured
+// HasApplicationInsights returns whether application insights export is configured
 func (c *Config) HasApplicationInsights() bool {
 	return c.Enabled && c.instrumentationKey != ""
 }
