@@ -75,8 +75,8 @@ func TestGenerateDeviceID(t *testing.T) {
 	}
 
 	// Device ID should be a hex string
-	if len(deviceID1) != 32 { // MD5 hash is 32 hex characters
-		t.Errorf("Expected device ID to be 32 characters, got %d", len(deviceID1))
+	if len(deviceID1) != 64 { // SHA-256 hash is 64 hex characters
+		t.Errorf("Expected device ID to be 64 characters, got %d", len(deviceID1))
 	}
 }
 
@@ -113,8 +113,14 @@ func TestSetOTLPEndpoint(t *testing.T) {
 
 func TestTelemetryDisableViaEnvironment(t *testing.T) {
 	// Test that AKS_MCP_COLLECT_TELEMETRY=false disables telemetry
-	os.Setenv("AKS_MCP_COLLECT_TELEMETRY", "false")
-	defer os.Unsetenv("AKS_MCP_COLLECT_TELEMETRY")
+	if err := os.Setenv("AKS_MCP_COLLECT_TELEMETRY", "false"); err != nil {
+		t.Fatalf("Failed to set environment variable: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("AKS_MCP_COLLECT_TELEMETRY"); err != nil {
+			t.Errorf("Failed to unset environment variable: %v", err)
+		}
+	}()
 
 	config := NewConfig("test-service", "v1.0.0")
 
@@ -130,8 +136,14 @@ func TestTelemetryDisableViaEnvironment(t *testing.T) {
 
 func TestTelemetryEnableViaEnvironment(t *testing.T) {
 	// Test that AKS_MCP_COLLECT_TELEMETRY=true enables telemetry
-	os.Setenv("AKS_MCP_COLLECT_TELEMETRY", "true")
-	defer os.Unsetenv("AKS_MCP_COLLECT_TELEMETRY")
+	if err := os.Setenv("AKS_MCP_COLLECT_TELEMETRY", "true"); err != nil {
+		t.Fatalf("Failed to set environment variable: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("AKS_MCP_COLLECT_TELEMETRY"); err != nil {
+			t.Errorf("Failed to unset environment variable: %v", err)
+		}
+	}()
 
 	config := NewConfig("test-service", "v1.0.0")
 

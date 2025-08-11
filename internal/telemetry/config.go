@@ -1,7 +1,7 @@
 package telemetry
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"net"
 	"os"
@@ -58,18 +58,18 @@ func generateDeviceID() string {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		// Fallback to a default identifier if network interfaces can't be read
-		return fmt.Sprintf("%x", md5.Sum([]byte("aks-mcp-fallback")))
+		return fmt.Sprintf("%x", sha256.Sum256([]byte("aks-mcp-fallback")))
 	}
 
 	// Find the first non-loopback interface with a MAC address
 	for _, iface := range interfaces {
 		if iface.Flags&net.FlagLoopback == 0 && iface.HardwareAddr != nil {
-			return fmt.Sprintf("%x", md5.Sum([]byte(iface.HardwareAddr.String())))
+			return fmt.Sprintf("%x", sha256.Sum256([]byte(iface.HardwareAddr.String())))
 		}
 	}
 
 	// Fallback if no suitable interface is found
-	return fmt.Sprintf("%x", md5.Sum([]byte("aks-mcp-no-mac")))
+	return fmt.Sprintf("%x", sha256.Sum256([]byte("aks-mcp-no-mac")))
 }
 
 // getApplicationInsightsInstrumentationKey retrieves the instrumentation key from environment
