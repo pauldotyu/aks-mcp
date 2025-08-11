@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/aks-mcp/internal/command"
 	"github.com/Azure/aks-mcp/internal/config"
 	"github.com/Azure/aks-mcp/internal/tools"
 )
@@ -251,6 +250,11 @@ func handleLifecycleAction(mgr GadgetManager, deployed bool, action string, acti
 		fmt.Fprintf(os.Stderr, "Failed to get latest version: %v\n", err)
 	}
 
+	hc, err := newHelmClient(cfg.Verbose)
+	if err != nil {
+		return "", fmt.Errorf("creating helm client: %w", err)
+	}
+
 	switch action {
 	case isDeployedAction:
 		if deployed {
@@ -261,12 +265,12 @@ func handleLifecycleAction(mgr GadgetManager, deployed bool, action string, acti
 		if !deployed {
 			return "inspektor gadget is not deployed", nil
 		}
-		return handleUndeployAction(cfg)
+		return handleUndeployAction(hc)
 	case deployAction:
 		if deployed {
 			return "inspektor gadget is already deployed (version: " + installedVersion + ", latest: " + latestVersion + ")", nil
 		}
-		return handleDeployAction(actionParams, cfg)
+		return handleDeployAction(hc, actionParams)
 	case upgradeAction:
 		if !deployed {
 			return "inspektor gadget is not deployed, no upgrade needed", nil
@@ -274,39 +278,46 @@ func handleLifecycleAction(mgr GadgetManager, deployed bool, action string, acti
 		if installedVersion == latestVersion {
 			return fmt.Sprintf("inspektor gadget is already at the latest version (%s), no upgrade needed", installedVersion), nil
 		}
-		return handleUpgradeAction(actionParams, cfg)
+		return handleUpgradeAction(hc, actionParams)
 	}
 
 	return "", fmt.Errorf("unsupported lifecycle action %q, must be one of %v", action, getLifecycleActions())
 }
 
-func handleDeployAction(actionParams map[string]interface{}, cfg *config.ConfigData) (string, error) {
+func handleDeployAction(client HelmClient, actionParams map[string]interface{}) (string, error) {
 	chartVersion, ok := actionParams["chart_version"].(string)
 	if !ok || chartVersion == "" {
 		chartVersion = getChartVersion()
 	}
 	chartUrl := fmt.Sprintf("%s:%s", inspektorGadgetChartURL, chartVersion)
-	helmArgs := fmt.Sprintf("install %s -n %s --create-namespace %s", inspektorGadgetChartRelease, inspektorGadgetChartNamespace, chartUrl)
-	process := command.NewShellProcess("helm", cfg.Timeout)
-	return process.Run(helmArgs)
+	return client.InstallChart(chartUrl, inspektorGadgetChartRelease, inspektorGadgetChartNamespace)
 }
 
-func handleUndeployAction(cfg *config.ConfigData) (string, error) {
-	helmArgs := fmt.Sprintf("uninstall %s -n %s", inspektorGadgetChartRelease, inspektorGadgetChartNamespace)
-	process := command.NewShellProcess("helm", cfg.Timeout)
-	return process.Run(helmArgs)
-}
-
-func handleUpgradeAction(actionParams map[string]interface{}, cfg *config.ConfigData) (string, error) {
-	// Check if the release exists before upgrading
-	helmGetArgs := fmt.Sprintf("get metadata %s -n %s", inspektorGadgetChartRelease, inspektorGadgetChartNamespace)
-	process := command.NewShellProcess("helm", cfg.Timeout)
-	out, err := process.Run(helmGetArgs)
+func handleUndeployAction(client HelmClient) (string, error) {
+	// Verify if the release exists before uninstalling
+	err := verifyRelease(client)
 	if err != nil {
-		return "", fmt.Errorf("getting helm release %s: %w", inspektorGadgetChartRelease, err)
+		return "", fmt.Errorf("verifying release: %w", err)
 	}
-	if strings.Contains(out, "release: not found") {
-		return "", fmt.Errorf("helm release not found, cannot upgrade. Did you manually deploy Inspektor Gadget?")
+	return client.UninstallChart(inspektorGadgetChartRelease, inspektorGadgetChartNamespace)
+}
+
+func verifyRelease(client HelmClient) error {
+	err := client.CheckRelease(inspektorGadgetChartRelease, inspektorGadgetChartNamespace)
+	if err != nil {
+		if strings.Contains(err.Error(), "release: not found") {
+			return fmt.Errorf("helm release %q not found. Did you manually deploy Inspektor Gadget?", inspektorGadgetChartRelease)
+		}
+		return fmt.Errorf("getting helm release status: %w", err)
+	}
+	return nil
+}
+
+func handleUpgradeAction(client HelmClient, actionParams map[string]interface{}) (string, error) {
+	// Verify if the release exists before upgrading
+	err := verifyRelease(client)
+	if err != nil {
+		return "", fmt.Errorf("verifying release: %w", err)
 	}
 	// Proceed with upgrade if the release exists
 	chartVersion, ok := actionParams["chart_version"].(string)
@@ -314,9 +325,7 @@ func handleUpgradeAction(actionParams map[string]interface{}, cfg *config.Config
 		chartVersion = getChartVersion()
 	}
 	chartUrl := fmt.Sprintf("%s:%s", inspektorGadgetChartURL, chartVersion)
-	helmArgs := fmt.Sprintf("upgrade %s -n %s --create-namespace %s", inspektorGadgetChartRelease, inspektorGadgetChartNamespace, chartUrl)
-	process = command.NewShellProcess("helm", cfg.Timeout)
-	return process.Run(helmArgs)
+	return client.UpgradeChart(chartUrl, inspektorGadgetChartRelease, inspektorGadgetChartNamespace)
 }
 
 func prepareCommonParams(filterParams map[string]interface{}, cfg *config.ConfigData) (map[string]string, error) {
