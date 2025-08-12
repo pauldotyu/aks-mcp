@@ -5,6 +5,7 @@ import (
 	"github.com/Azure/aks-mcp/internal/tools"
 	k8sconfig "github.com/Azure/mcp-kubernetes/pkg/config"
 	k8ssecurity "github.com/Azure/mcp-kubernetes/pkg/security"
+	k8stelemetry "github.com/Azure/mcp-kubernetes/pkg/telemetry"
 	k8stools "github.com/Azure/mcp-kubernetes/pkg/tools"
 )
 
@@ -19,14 +20,16 @@ func ConvertConfig(cfg *config.ConfigData) *k8sconfig.ConfigData {
 
 	// Create K8s config
 	k8sCfg := &k8sconfig.ConfigData{
-		AdditionalTools: cfg.AdditionalTools,
-		Timeout:         cfg.Timeout,
-		SecurityConfig:  k8sSecurityConfig,
-		Transport:       cfg.Transport,
-		Host:            cfg.Host,
-		Port:            cfg.Port,
-		AccessLevel:     cfg.AccessLevel,
-		AllowNamespaces: cfg.AllowNamespaces,
+		AdditionalTools:  cfg.AdditionalTools,
+		Timeout:          cfg.Timeout,
+		SecurityConfig:   k8sSecurityConfig,
+		Transport:        cfg.Transport,
+		Host:             cfg.Host,
+		Port:             cfg.Port,
+		AccessLevel:      cfg.AccessLevel,
+		AllowNamespaces:  cfg.AllowNamespaces,
+		OTLPEndpoint:     cfg.OTLPEndpoint,
+		TelemetryService: k8stelemetry.TelemetryInterface(cfg.TelemetryService),
 	}
 
 	return k8sCfg
