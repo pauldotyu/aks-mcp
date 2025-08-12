@@ -43,9 +43,9 @@ func (v *Validator) validateCli() bool {
 		valid = false
 	}
 
-	// helm is required for Inspektor Gadget component and when explicitly enabled
-	if !v.isCliInstalled("helm") {
-		v.errors = append(v.errors, "helm is not installed or not found in PATH (required for Inspektor Gadget observability)")
+	// helm is optional - only validate if explicitly enabled
+	if v.config.AdditionalTools["helm"] && !v.isCliInstalled("helm") {
+		v.errors = append(v.errors, "helm is not installed or not found in PATH (required when --additional-tools includes helm)")
 		valid = false
 	}
 
