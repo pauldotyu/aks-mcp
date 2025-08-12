@@ -40,9 +40,19 @@ func CreateToolHandler(executor CommandExecutor, cfg *config.ConfigData) func(ct
 
 		args, ok := req.Params.Arguments.(map[string]interface{})
 		if !ok {
-			return mcp.NewToolResultError("arguments must be a map[string]interface{}, got " + fmt.Sprintf("%T", req.Params.Arguments)), nil
+			err := fmt.Errorf("arguments must be a map[string]interface{}, got %T", req.Params.Arguments)
+			// Track failed tool invocation
+			if cfg.TelemetryService != nil {
+				cfg.TelemetryService.TrackToolInvocation(ctx, req.Params.Name, "", false)
+			}
+			return mcp.NewToolResultError(err.Error()), nil
 		}
+
 		result, err := executor.Execute(args, cfg)
+		if cfg.TelemetryService != nil {
+			operation, _ := args["operation"].(string)
+			cfg.TelemetryService.TrackToolInvocation(ctx, req.Params.Name, operation, err == nil)
+		}
 
 		if cfg.Verbose {
 			logToolResult(req.Params.Name, result, err)
@@ -65,9 +75,21 @@ func CreateResourceHandler(handler ResourceHandler, cfg *config.ConfigData) func
 
 		args, ok := req.Params.Arguments.(map[string]interface{})
 		if !ok {
-			return mcp.NewToolResultError("arguments must be a map[string]interface{}, got " + fmt.Sprintf("%T", req.Params.Arguments)), nil
+			err := fmt.Errorf("arguments must be a map[string]interface{}, got %T", req.Params.Arguments)
+			// Track failed tool invocation
+			if cfg.TelemetryService != nil {
+				cfg.TelemetryService.TrackToolInvocation(ctx, req.Params.Name, "", false)
+			}
+			return mcp.NewToolResultError(err.Error()), nil
 		}
+
 		result, err := handler.Handle(args, cfg)
+
+		// Track tool invocation with minimal data
+		if cfg.TelemetryService != nil {
+			operation, _ := args["operation"].(string)
+			cfg.TelemetryService.TrackToolInvocation(ctx, req.Params.Name, operation, err == nil)
+		}
 
 		if cfg.Verbose {
 			logToolResult(req.Params.Name, result, err)
