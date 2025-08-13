@@ -16,6 +16,7 @@ import (
 	"github.com/Azure/aks-mcp/internal/components/network"
 	"github.com/Azure/aks-mcp/internal/config"
 	"github.com/Azure/aks-mcp/internal/k8s"
+	"github.com/Azure/aks-mcp/internal/prompts"
 	"github.com/Azure/aks-mcp/internal/tools"
 	"github.com/Azure/aks-mcp/internal/version"
 	"github.com/Azure/mcp-kubernetes/pkg/cilium"
@@ -70,6 +71,7 @@ func (s *Service) initializeInfrastructure() error {
 		"AKS MCP",
 		version.GetVersion(),
 		server.WithResourceCapabilities(true, true),
+		server.WithPromptCapabilities(true),
 		server.WithLogging(),
 		server.WithRecovery(),
 	)
@@ -85,6 +87,17 @@ func (s *Service) registerAllComponents() {
 
 	// Kubernetes Components
 	s.registerKubernetesComponents()
+
+	// Prompts
+	s.registerPrompts()
+}
+
+// registerPrompts registers all available prompts
+func (s *Service) registerPrompts() {
+	log.Println("Registering Prompts...")
+
+	log.Println("Registering prompt: query_aks_cluster_metadata_from_kubeconfig")
+	prompts.RegisterQueryAKSMetadataFromKubeconfigPrompt(s.mcpServer, s.cfg)
 }
 
 // Run starts the service with the specified transport
