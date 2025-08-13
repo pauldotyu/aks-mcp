@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/Azure/aks-mcp/internal/components/azaks"
-	"github.com/Azure/aks-mcp/internal/components/compute"
 	"github.com/Azure/aks-mcp/internal/config"
 	"github.com/Azure/mcp-kubernetes/pkg/kubectl"
 )
@@ -195,18 +194,11 @@ func TestComponentToolCounts(t *testing.T) {
 
 		// Test compute component separately due to access level variations
 		t.Run("ComputeComponent", func(t *testing.T) {
-			readOnlyCount := len(compute.GetReadOnlyVmssCommands()) + 1 // +1 for get_aks_vmss_info
-			readWriteCount := len(compute.GetReadWriteVmssCommands())
-			adminCount := len(compute.GetAdminVmssCommands())
+			baseComputeToolsCount := 2 // get_aks_vmss_info + az_compute_operations
 
 			t.Logf("Compute Component:")
-			t.Logf("  - Base tools (always): %d (get_aks_vmss_info)", 1)
-			t.Logf("  - Read-only VMSS commands: %d", len(compute.GetReadOnlyVmssCommands()))
-			t.Logf("  - Read-write VMSS commands: %d", readWriteCount)
-			t.Logf("  - Admin VMSS commands: %d", adminCount)
-			t.Logf("  - Total for readonly: %d", readOnlyCount)
-			t.Logf("  - Total for readwrite: %d", readOnlyCount+readWriteCount)
-			t.Logf("  - Total for admin: %d", readOnlyCount+readWriteCount+adminCount)
+			t.Logf("  - Base tools (always): %d (get_aks_vmss_info, az_compute_operations)", baseComputeToolsCount)
+			t.Logf("  - All access levels have the same tools, but operations are restricted by access level validation")
 		})
 	})
 
@@ -305,19 +297,10 @@ func TestExpectedToolsByAccessLevel(t *testing.T) {
 
 	for _, level := range accessLevels {
 		t.Run("AccessLevel_"+level, func(t *testing.T) {
-			// Azure Components (always the same count, but different capabilities)
+			// Azure Components (always the same count, unified tools)
 			azureToolsCount := 8 // Base count (including Inspektor Gadget)
-
-			// Add compute tools based on access level
-			readWriteVmssCount := len(compute.GetReadWriteVmssCommands())
-			adminVmssCount := len(compute.GetAdminVmssCommands())
-
-			if level == "readwrite" || level == "admin" {
-				azureToolsCount += readWriteVmssCount
-			}
-			if level == "admin" {
-				azureToolsCount += adminVmssCount
-			}
+			// Note: With unified tools, the count doesn't change by access level
+			// Access control is handled by operation validation, not tool registration
 
 			// Kubernetes tools
 			kubectlTools := kubectl.RegisterKubectlTools(level)
@@ -329,11 +312,7 @@ func TestExpectedToolsByAccessLevel(t *testing.T) {
 			t.Logf("  - Monitoring: 1")
 			t.Logf("  - Fleet: 1")
 			t.Logf("  - Network: 1")
-			t.Logf("  - Compute Base: 1 (get_aks_vmss_info)")
-			t.Logf("  - Compute ReadWrite: %d", readWriteVmssCount)
-			if level == "admin" {
-				t.Logf("  - Compute Admin: %d", adminVmssCount)
-			}
+			t.Logf("  - Compute: 2 (get_aks_vmss_info, az_compute_operations)")
 			t.Logf("  - Detectors: 3")
 			t.Logf("  - Advisor: 1")
 			t.Logf("  - Inspektor Gadget: 1 (automatically enabled)")
