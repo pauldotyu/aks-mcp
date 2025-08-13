@@ -2,7 +2,6 @@ package prompts
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/Azure/aks-mcp/internal/config"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -15,7 +14,7 @@ func RegisterQueryAKSMetadataFromKubeconfigPrompt(s *server.MCPServer, cfg *conf
 		mcp.WithPromptDescription("Query AKS cluster (subscriptionID, resourceGroup and name) from current kubeconfig"),
 	), func(ctx context.Context, request mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 
-		promptContent := fmt.Sprintf(`# Query AKS cluster metadata from current kubeconfig
+		promptContent := `# Query AKS cluster metadata from current kubeconfig
 
 This guide will help you query AKS cluster metadata (subscriptionID, resourceGroup and name) from current kubeconfig.
 
@@ -47,7 +46,7 @@ This will show all the AKS clusters (in JSON format) in user pre-configured subs
 
 Compare the control plane FQDN from Step 1 with the FQDNs of the AKS clusters from Step 2,
 figure out the matched AKS cluster, and then respond the AKS cluster's subscriptionID, resourceGroup and name.
-`)
+`
 
 		return &mcp.GetPromptResult{
 			Description: "Query AKS cluster (subscriptionID, resourceGroup and name) from current kubeconfig",
