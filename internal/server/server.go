@@ -264,33 +264,10 @@ func (s *Service) registerComputeComponent() {
 	vmssInfoTool := compute.RegisterAKSVMSSInfoTool()
 	s.mcpServer.AddTool(vmssInfoTool, tools.CreateResourceHandler(compute.GetAKSVMSSInfoHandler(s.azClient, s.cfg), s.cfg))
 
-	// Register read-only az vmss commands (available at all access levels)
-	for _, cmd := range compute.GetReadOnlyVmssCommands() {
-		log.Printf("Registering az vmss command: %s (readonly)", cmd.Name)
-		azTool := compute.RegisterAzComputeCommand(cmd)
-		commandExecutor := azcli.CreateCommandExecutorFunc(cmd.Name)
-		s.mcpServer.AddTool(azTool, tools.CreateToolHandler(commandExecutor, s.cfg))
-	}
-
-	// Register read-write commands if access level is readwrite or admin
-	if s.cfg.AccessLevel == "readwrite" || s.cfg.AccessLevel == "admin" {
-		for _, cmd := range compute.GetReadWriteVmssCommands() {
-			log.Printf("Registering az vmss command: %s (readwrite)", cmd.Name)
-			azTool := compute.RegisterAzComputeCommand(cmd)
-			commandExecutor := azcli.CreateCommandExecutorFunc(cmd.Name)
-			s.mcpServer.AddTool(azTool, tools.CreateToolHandler(commandExecutor, s.cfg))
-		}
-	}
-
-	// Register admin commands only if access level is admin
-	if s.cfg.AccessLevel == "admin" {
-		for _, cmd := range compute.GetAdminVmssCommands() {
-			log.Printf("Registering az vmss command: %s (admin)", cmd.Name)
-			azTool := compute.RegisterAzComputeCommand(cmd)
-			commandExecutor := azcli.CreateCommandExecutorFunc(cmd.Name)
-			s.mcpServer.AddTool(azTool, tools.CreateToolHandler(commandExecutor, s.cfg))
-		}
-	}
+	// Register unified compute operations tool
+	log.Println("Registering compute tool: az_compute_operations")
+	computeOperationsTool := compute.RegisterAzComputeOperations(s.cfg)
+	s.mcpServer.AddTool(computeOperationsTool, tools.CreateToolHandler(compute.NewComputeOperationsExecutor(), s.cfg))
 }
 
 // registerDetectorComponent registers detector-related Azure resource tools

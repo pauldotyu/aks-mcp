@@ -28,25 +28,3 @@ func RegisterAKSVMSSInfoTool() mcp.Tool {
 		),
 	)
 }
-
-// VMSS Command Registration Functions
-
-// RegisterAzVmssCommand registers a specific az vmss command as an MCP tool
-func RegisterAzVmssCommand(cmd ComputeCommand) mcp.Tool {
-	return RegisterAzComputeCommand(cmd)
-}
-
-// GetReadOnlyVmssAzCommands returns all read-only az vmss commands
-func GetReadOnlyVmssAzCommands() []ComputeCommand {
-	return GetReadOnlyVmssCommands()
-}
-
-// GetReadWriteVmssAzCommands returns all read-write az vmss commands
-func GetReadWriteVmssAzCommands() []ComputeCommand {
-	return GetReadWriteVmssCommands()
-}
-
-// GetAdminVmssAzCommands returns all admin az vmss commands
-func GetAdminVmssAzCommands() []ComputeCommand {
-	return GetAdminVmssCommands()
-}
