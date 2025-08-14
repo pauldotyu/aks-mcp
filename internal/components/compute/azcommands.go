@@ -15,31 +15,19 @@ type ComputeOperationType string
 type ResourceType string
 
 const (
-	// VM operations
+	// VM operations - safe operations only
 	OpVMShow            ComputeOperationType = "show"
 	OpVMList            ComputeOperationType = "list"
-	OpVMCreate          ComputeOperationType = "create"
-	OpVMDelete          ComputeOperationType = "delete"
 	OpVMStart           ComputeOperationType = "start"
 	OpVMStop            ComputeOperationType = "stop"
 	OpVMRestart         ComputeOperationType = "restart"
-	OpVMDeallocate      ComputeOperationType = "deallocate"
-	OpVMResize          ComputeOperationType = "resize"
-	OpVMUpdate          ComputeOperationType = "update"
 	OpVMGetInstanceView ComputeOperationType = "get-instance-view"
 	OpVMRunCommand      ComputeOperationType = "run-command"
 
-	// VMSS operations (some overlap with VM)
+	// VMSS operations - only safe operations for AKS-managed VMSS
 	OpVMSSShow            ComputeOperationType = "show"
 	OpVMSSList            ComputeOperationType = "list"
-	OpVMSSCreate          ComputeOperationType = "create"
-	OpVMSSDelete          ComputeOperationType = "delete"
-	OpVMSSStart           ComputeOperationType = "start"
-	OpVMSSStop            ComputeOperationType = "stop"
 	OpVMSSRestart         ComputeOperationType = "restart"
-	OpVMSSDeallocate      ComputeOperationType = "deallocate"
-	OpVMSSScale           ComputeOperationType = "scale"
-	OpVMSSUpdate          ComputeOperationType = "update"
 	OpVMSSReimage         ComputeOperationType = "reimage"
 	OpVMSSGetInstanceView ComputeOperationType = "get-instance-view"
 	OpVMSSRunCommand      ComputeOperationType = "run-command"
@@ -52,6 +40,8 @@ const (
 // generateToolDescription creates a tool description based on access level
 func generateToolDescription(accessLevel string) string {
 	baseDesc := `Unified tool for managing Azure Virtual Machines (VMs) and Virtual Machine Scale Sets (VMSS) using Azure CLI.
+
+IMPORTANT: VM/VMSS resources are managed by AKS. Write operations should be used carefully and only for debugging purposes.
 
 Use resource_type="vm" for single virtual machines or resource_type="vmss" for virtual machine scale sets.
 
@@ -67,23 +57,15 @@ Available operation values:`
 
 	// Management operations for readwrite/admin
 	if accessLevel == "readwrite" || accessLevel == "admin" {
-		desc += "- start: Start VM/VMSS\n"
-		desc += "- stop: Stop VM/VMSS\n"
-		desc += "- restart: Restart VM/VMSS\n"
-		desc += "- deallocate: Stop and deallocate VM/VMSS\n"
-		desc += "- run-command: Execute commands remotely\n"
-		desc += "- scale: Change VMSS instance count\n"
-		desc += "- reimage: Reset VMSS instances\n"
+		desc += "- start: Start VM\n"
+		desc += "- stop: Stop VM\n"
+		desc += "- restart: Restart VM/VMSS instances\n"
+		desc += "- run-command: Execute commands remotely on VM/VMSS instances\n"
+		desc += "- reimage: Reimage VMSS instances (VM not supported for reimage)\n"
 	}
 
-	// Admin operations
-	if accessLevel == "admin" {
-		desc += "\nAdmin-only operation values:\n"
-		desc += "- create: Create new VM/VMSS\n"
-		desc += "- delete: Delete VM/VMSS\n"
-		desc += "- update: Update VM/VMSS configuration\n"
-		desc += "- resize: Change VM size\n"
-	}
+	// Note: All destructive operations (create, delete, deallocate, update, resize, scale)
+	// have been removed for AKS environment safety
 
 	// Examples
 	desc += "\nEXAMPLES:\n"
@@ -92,16 +74,10 @@ Available operation values:`
 	desc += `List VMs: operation="list", resource_type="vm", args="--resource-group myRG"` + "\n"
 
 	if accessLevel == "readwrite" || accessLevel == "admin" {
-		desc += `Start VMSS: operation="start", resource_type="vmss", args="--name myVMSS --resource-group myRG"` + "\n"
+		desc += `Restart VMSS: operation="restart", resource_type="vmss", args="--name myVMSS --resource-group myRG"` + "\n"
+		desc += `Reimage VMSS: operation="reimage", resource_type="vmss", args="--name myVMSS --resource-group myRG"` + "\n"
 		desc += `Run command on VM: operation="run-command", resource_type="vm", args="--name myVM --resource-group myRG --command-id RunShellScript --scripts 'echo hello'"` + "\n"
 		desc += `Run command on VMSS: operation="run-command", resource_type="vmss", args="--name myVMSS --resource-group myRG --command-id RunShellScript --scripts 'hostname' --instance-id 0"` + "\n"
-	}
-
-	if accessLevel == "admin" {
-		desc += `Create VMSS: operation="create", resource_type="vmss", args="--name newVMSS --resource-group myRG --image Ubuntu2204 --admin-username azuser --instance-count 3 --vm-sku Standard_B2s"` + "\n"
-		desc += `Update VMSS: operation="update", resource_type="vmss", args="--name myVMSS --resource-group myRG --set upgradePolicy.mode=Automatic"` + "\n"
-		desc += `Delete VMSS: operation="delete", resource_type="vmss", args="--name myVMSS --resource-group myRG"` + "\n"
-		desc += `Create VM: operation="create", resource_type="vm", args="--name newVM --resource-group myRG --image Ubuntu2204 --admin-username azuser --generate-ssh-keys"` + "\n"
 	}
 
 	return desc
@@ -136,17 +112,14 @@ func GetOperationAccessLevel(operation string) string {
 	}
 
 	readWriteOps := []string{
-		string(OpVMStart), string(OpVMStop), string(OpVMRestart),
-		string(OpVMDeallocate), string(OpVMRunCommand),
-		string(OpVMSSStart), string(OpVMSSStop), string(OpVMSSRestart),
-		string(OpVMSSDeallocate), string(OpVMSSScale), string(OpVMSSReimage),
-		string(OpVMSSRunCommand),
+		// VM operations - safe operations only
+		string(OpVMStart), string(OpVMStop), string(OpVMRestart), string(OpVMRunCommand),
+		// VMSS operations - only safe operations for AKS-managed VMSS
+		string(OpVMSSRestart), string(OpVMSSReimage), string(OpVMSSRunCommand),
 	}
 
-	adminOps := []string{
-		string(OpVMCreate), string(OpVMDelete), string(OpVMResize), string(OpVMUpdate),
-		string(OpVMSSCreate), string(OpVMSSDelete), string(OpVMSSUpdate),
-	}
+	// No admin operations - all unsafe operations removed
+	adminOps := []string{}
 
 	if slices.Contains(readOnlyOps, operation) {
 		return "readonly"
@@ -194,33 +167,25 @@ func MapOperationToCommand(operation string, resourceType string) (string, error
 
 	commandMap := map[string]map[string]string{
 		string(ResourceTypeVM): {
+			// Safe VM operations only
 			string(OpVMShow):            "az vm show",
 			string(OpVMList):            "az vm list",
-			string(OpVMCreate):          "az vm create",
-			string(OpVMDelete):          "az vm delete",
 			string(OpVMStart):           "az vm start",
 			string(OpVMStop):            "az vm stop",
 			string(OpVMRestart):         "az vm restart",
-			string(OpVMDeallocate):      "az vm deallocate",
-			string(OpVMResize):          "az vm resize",
-			string(OpVMUpdate):          "az vm update",
 			string(OpVMGetInstanceView): "az vm get-instance-view",
 			string(OpVMRunCommand):      "az vm run-command invoke",
 		},
 		string(ResourceTypeVMSS): {
+			// Read-only operations
 			string(OpVMSSShow):            "az vmss show",
 			string(OpVMSSList):            "az vmss list",
-			string(OpVMSSCreate):          "az vmss create",
-			string(OpVMSSDelete):          "az vmss delete",
-			string(OpVMSSStart):           "az vmss start",
-			string(OpVMSSStop):            "az vmss stop",
-			string(OpVMSSRestart):         "az vmss restart",
-			string(OpVMSSDeallocate):      "az vmss deallocate",
-			string(OpVMSSScale):           "az vmss scale",
-			string(OpVMSSUpdate):          "az vmss update",
-			string(OpVMSSReimage):         "az vmss reimage",
 			string(OpVMSSGetInstanceView): "az vmss get-instance-view",
-			string(OpVMSSRunCommand):      "az vmss run-command invoke",
+			// Safe operations for AKS-managed VMSS
+			string(OpVMSSRestart):    "az vmss restart",
+			string(OpVMSSReimage):    "az vmss reimage",
+			string(OpVMSSRunCommand): "az vmss run-command invoke",
+			// Removed unsafe operations: create, delete, start, stop, deallocate, scale, update
 		},
 	}
 

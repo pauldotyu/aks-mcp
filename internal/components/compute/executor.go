@@ -22,7 +22,7 @@ func (e *ComputeOperationsExecutor) Execute(params map[string]interface{}, cfg *
 	// Parse operation parameter
 	operation, ok := params["operation"].(string)
 	if !ok {
-		return "", fmt.Errorf("missing or invalid 'operation' parameter. Common operations: list, show, start, stop, scale, run-command. Example: operation=\"list\"")
+		return "", fmt.Errorf("missing or invalid 'operation' parameter. Common operations: list, show, start, stop, restart, run-command, reimage. Example: operation=\"list\"")
 	}
 
 	// Parse resource_type parameter
@@ -100,14 +100,10 @@ func (e *ComputeOperationsExecutor) Execute(params map[string]interface{}, cfg *
 			errorMsg += "\nTip: Verify the resource name and resource group are correct and the resource exists"
 		case "start", "stop", "restart":
 			errorMsg += "\nTip: Verify the resource exists and check if it's already in the desired state"
-		case "scale":
-			errorMsg += "\nTip: Verify the VMSS name is correct and the new-capacity value is valid (typically 1-1000)"
+		case "reimage":
+			errorMsg += "\nTip: Verify the VMSS name is correct and the instances are ready for reimaging"
 		case "run-command":
 			errorMsg += "\nTip: Ensure the resource is running and the command syntax is correct. Use --command-id RunShellScript for shell commands"
-		case "create":
-			errorMsg += "\nTip: Check required parameters like --image, --admin-username, and ensure resource names are unique"
-		case "delete":
-			errorMsg += "\nTip: Verify the resource exists and you have sufficient permissions to delete it"
 		}
 
 		return "", fmt.Errorf("%s\nExecuted command: %s", errorMsg, fullCommand)
@@ -125,19 +121,17 @@ func getSuggestedOperations(resourceType, accessLevel string) string {
 
 	// Read-write operations
 	if accessLevel == "readwrite" || accessLevel == "admin" {
-		operations = append(operations, "start", "stop", "restart", "deallocate", "run-command")
-		if resourceType == "vmss" {
-			operations = append(operations, "scale", "reimage")
+		switch resourceType {
+		case "vm":
+			// Only safe VM operations
+			operations = append(operations, "start", "stop", "restart", "run-command")
+		case "vmss":
+			// Only safe operations for AKS-managed VMSS
+			operations = append(operations, "restart", "reimage", "run-command")
 		}
 	}
 
-	// Admin operations
-	if accessLevel == "admin" {
-		operations = append(operations, "create", "delete", "update")
-		if resourceType == "vm" {
-			operations = append(operations, "resize")
-		}
-	}
+	// No admin operations - all unsafe operations removed for AKS safety
 
 	return strings.Join(operations, ", ")
 }

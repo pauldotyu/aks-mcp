@@ -24,9 +24,9 @@ func TestRegisterAzComputeOperations(t *testing.T) {
 				t.Error("Expected tool description to be set")
 			}
 
-			// Check that description varies by access level
-			if level == "admin" && !strings.Contains(tool.Description, "create") {
-				t.Error("Admin access should include 'create' operations in description")
+			// Check that description varies by access level and contains safety warning
+			if !strings.Contains(tool.Description, "IMPORTANT: VM/VMSS resources are managed by AKS") {
+				t.Error("All access levels should include AKS safety warning")
 			}
 		})
 	}
@@ -47,17 +47,18 @@ func TestValidateOperationAccess(t *testing.T) {
 		{"start", "readonly", false},
 		{"start", "readwrite", true},
 		{"start", "admin", true},
-		{"scale", "readonly", false},
-		{"scale", "readwrite", true},
-		{"scale", "admin", true},
-
-		// Admin operations
-		{"create", "readonly", false},
-		{"create", "readwrite", false},
-		{"create", "admin", true},
-		{"delete", "readonly", false},
-		{"delete", "readwrite", false},
-		{"delete", "admin", true},
+		{"stop", "readonly", false},
+		{"stop", "readwrite", true},
+		{"stop", "admin", true},
+		{"restart", "readonly", false},
+		{"restart", "readwrite", true},
+		{"restart", "admin", true},
+		{"run-command", "readonly", false},
+		{"run-command", "readwrite", true},
+		{"run-command", "admin", true},
+		{"reimage", "readonly", false},
+		{"reimage", "readwrite", true},
+		{"reimage", "admin", true},
 
 		// Unknown operations
 		{"invalid-op", "admin", false},
@@ -92,8 +93,10 @@ func TestMapOperationToCommand(t *testing.T) {
 
 		// VMSS operations
 		{"show", "vmss", "az vmss show", true},
-		{"scale", "vmss", "az vmss scale", true},
+		{"restart", "vmss", "az vmss restart", true},
+		{"reimage", "vmss", "az vmss reimage", true},
 		{"run-command", "vmss", "az vmss run-command invoke", true},
+		// Scale operation removed - not safe for AKS-managed VMSS
 
 		// Invalid resource types
 		{"show", "invalid", "", false},
@@ -136,15 +139,8 @@ func TestGetOperationAccessLevel(t *testing.T) {
 		{"start", "readwrite"},
 		{"stop", "readwrite"},
 		{"restart", "readwrite"},
-		{"deallocate", "readwrite"},
-		{"scale", "readwrite"},
+		{"reimage", "readwrite"},
 		{"run-command", "readwrite"},
-
-		// Admin operations
-		{"create", "admin"},
-		{"delete", "admin"},
-		{"update", "admin"},
-		{"resize", "admin"},
 
 		// Unknown operations
 		{"invalid-op", "unknown"},
