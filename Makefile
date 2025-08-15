@@ -1,6 +1,10 @@
 # AKS-MCP Makefile
 # Provides convenience targets for development, building, testing, and releasing
 
+# Run multi-line recipes in bash and fail on any command error
+SHELL := /usr/bin/env bash
+SHELLFLAGS := -eo pipefail -c
+
 # Variables
 BINARY_NAME = aks-mcp
 MAIN_PATH = ./cmd/aks-mcp
@@ -183,6 +187,7 @@ version: ## Show version information
 
 .PHONY: info
 info: ## Show build information
+	@echo "Shell: $(SHELL) $(SHELLFLAGS)"
 	@echo "Binary Name: $(BINARY_NAME)"
 	@echo "Main Path: $(MAIN_PATH)"
 	@echo "Docker Image: $(DOCKER_IMAGE):$(DOCKER_TAG)"

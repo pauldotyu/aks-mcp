@@ -525,6 +525,15 @@ Usage of ./aks-mcp:
 
 ## Development
 
+### Prerequisites
+
+- **Go** ≥ `1.24.x` installed on your local machine
+- **Bash** available as `/usr/bin/env bash` (Makefile targets use multi-line recipes with fail-fast mode)
+- **GNU Make** `4.x` or later
+- **Docker** *(optional, for container builds and testing)*
+
+> **Note:** If your login shell is different (e.g., `zsh` on **macOS**), you do **not** need to change it — the Makefile sets variables to run all recipes in `bash` for consistent behavior across platforms.
+
 ### Building from Source
 
 This project includes a Makefile for convenient development, building, and testing. To see all available targets:
