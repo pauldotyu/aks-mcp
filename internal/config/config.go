@@ -10,6 +10,7 @@ import (
 
 	"github.com/Azure/aks-mcp/internal/security"
 	"github.com/Azure/aks-mcp/internal/telemetry"
+	"github.com/Azure/aks-mcp/internal/version"
 	flag "github.com/spf13/pflag"
 )
 
@@ -80,9 +81,12 @@ func (cfg *ConfigData) ParseFlags() {
 	// OTLP settings
 	flag.StringVar(&cfg.OTLPEndpoint, "otlp-endpoint", "", "OTLP endpoint for OpenTelemetry traces (e.g. localhost:4317)")
 
-	// Custom help handling.
+	// Custom help handling
 	var showHelp bool
 	flag.BoolVarP(&showHelp, "help", "h", false, "Show help message")
+
+	// Version flag
+	showVersion := flag.Bool("version", false, "Show version information and exit")
 
 	// Parse flags and handle errors properly
 	err := flag.CommandLine.Parse(os.Args[1:])
@@ -96,6 +100,12 @@ func (cfg *ConfigData) ParseFlags() {
 	if showHelp {
 		fmt.Printf("Usage of %s:\n", os.Args[0])
 		flag.PrintDefaults()
+		os.Exit(0)
+	}
+
+	// Handle version flag
+	if *showVersion {
+		cfg.PrintVersion()
 		os.Exit(0)
 	}
 
@@ -131,4 +141,14 @@ func (cfg *ConfigData) InitializeTelemetry(ctx context.Context, serviceName, ser
 
 	// Track MCP server startup
 	cfg.TelemetryService.TrackServiceStartup(ctx)
+}
+
+// PrintVersion prints version information
+func (cfg *ConfigData) PrintVersion() {
+	versionInfo := version.GetVersionInfo()
+	fmt.Printf("aks-mcp version %s\n", versionInfo["version"])
+	fmt.Printf("Git commit: %s\n", versionInfo["gitCommit"])
+	fmt.Printf("Git tree state: %s\n", versionInfo["gitTreeState"])
+	fmt.Printf("Go version: %s\n", versionInfo["goVersion"])
+	fmt.Printf("Platform: %s\n", versionInfo["platform"])
 }

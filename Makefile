@@ -12,6 +12,8 @@ DOCKER_IMAGE = aks-mcp
 DOCKER_TAG ?= latest
 
 # Version information
+# Version is automatically derived from git tags using 'git describe --tags --always --dirty'
+# This provides proper semantic versioning based on GitHub releases and tags
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 GIT_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo "unknown")
 GIT_TREE_STATE ?= $(shell if git diff --quiet 2>/dev/null; then echo "clean"; else echo "dirty"; fi)

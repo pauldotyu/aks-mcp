@@ -8,7 +8,7 @@ import (
 // Version information
 var (
 	// GitVersion is the git tag version
-	GitVersion = "1"
+	GitVersion = "dev"
 	// BuildMetadata is extra build time data
 	BuildMetadata = ""
 	// GitCommit is the git sha1
