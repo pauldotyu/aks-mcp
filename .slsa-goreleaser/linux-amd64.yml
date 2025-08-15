@@ -20,6 +20,13 @@ flags:
   - -trimpath
   - -tags=withoutebpf # need by inspektor-gadget
 
+# (Optional) ldflags for version injection
+ldflags:
+  - "-X github.com/Azure/aks-mcp/internal/version.GitVersion={{ .Env.VERSION }}"
+  - "-X github.com/Azure/aks-mcp/internal/version.GitCommit={{ .Env.COMMIT }}"
+  - "-X github.com/Azure/aks-mcp/internal/version.GitTreeState={{ .Env.TREE_STATE }}"
+  - "-X github.com/Azure/aks-mcp/internal/version.BuildMetadata={{ .Env.COMMIT_DATE }}"
+
 # (Optional) Working directory. (default: root of the project)
 # dir: ./relative/path/to/dir
 

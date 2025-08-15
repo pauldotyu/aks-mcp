@@ -20,8 +20,15 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application for target platform
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o aks-mcp ./cmd/aks-mcp
+# Build the application for target platform with version injection
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+    -trimpath \
+    -tags withoutebpf \
+    -ldflags "-X github.com/Azure/aks-mcp/internal/version.GitVersion=${VERSION} \
+              -X github.com/Azure/aks-mcp/internal/version.GitCommit=${GIT_COMMIT} \
+              -X github.com/Azure/aks-mcp/internal/version.GitTreeState=${GIT_TREE_STATE} \
+              -X github.com/Azure/aks-mcp/internal/version.BuildMetadata=${BUILD_DATE}" \
+    -o aks-mcp ./cmd/aks-mcp
 
 # Runtime stage
 FROM alpine:3.22
