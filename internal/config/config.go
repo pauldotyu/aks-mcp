@@ -2,7 +2,9 @@ package config
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -78,7 +80,24 @@ func (cfg *ConfigData) ParseFlags() {
 	// OTLP settings
 	flag.StringVar(&cfg.OTLPEndpoint, "otlp-endpoint", "", "OTLP endpoint for OpenTelemetry traces (e.g. localhost:4317)")
 
-	flag.Parse()
+	// Custom help handling.
+	var showHelp bool
+	flag.BoolVarP(&showHelp, "help", "h", false, "Show help message")
+
+	// Parse flags and handle errors properly
+	err := flag.CommandLine.Parse(os.Args[1:])
+	if err != nil {
+		fmt.Printf("\nUsage of %s:\n", os.Args[0])
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	// Handle help manually with proper exit code
+	if showHelp {
+		fmt.Printf("Usage of %s:\n", os.Args[0])
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
 
 	// Update security config
 	cfg.SecurityConfig.AccessLevel = cfg.AccessLevel
