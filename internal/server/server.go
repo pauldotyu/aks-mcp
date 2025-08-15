@@ -96,8 +96,11 @@ func (s *Service) registerAllComponents() {
 func (s *Service) registerPrompts() {
 	log.Println("Registering Prompts...")
 
-	log.Println("Registering prompt: query_aks_cluster_metadata_from_kubeconfig")
+	log.Println("Registering config prompts (query_aks_cluster_metadata_from_kubeconfig)")
 	prompts.RegisterQueryAKSMetadataFromKubeconfigPrompt(s.mcpServer, s.cfg)
+
+	log.Println("Registering health prompts (check_cluster_health)")
+	prompts.RegisterHealthPrompts(s.mcpServer, s.cfg)
 }
 
 // Run starts the service with the specified transport
