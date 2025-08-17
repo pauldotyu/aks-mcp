@@ -1,0 +1,163 @@
+// This includes automatic login detection and supports multiple authentication methods
+// including service principals, managed identities, and federated tokens.
+package azcli
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+
+	"github.com/Azure/aks-mcp/internal/command"
+	"github.com/Azure/aks-mcp/internal/config"
+)
+
+// Login types
+const (
+	AuthTypeExisting                = "existing_login"
+	AuthTypeServicePrincipal        = "service_principal"
+	AuthTypeFederatedToken          = "federated_token"
+	AuthTypeUserAssignedManagedID   = "user_assigned_managed_identity"
+	AuthTypeSystemAssignedManagedID = "system_assigned_managed_identity"
+)
+
+// Proc is a minimal interface used by this package so tests can inject a fake process.
+type Proc interface {
+	// Run executes the given command (arguments may be included in the string) and
+	// returns the command output and an error. Implementations MUST return the
+	// combined stdout+stderr output in the string return value. The error should
+	// be non-nil when the underlying process fails to start or returns a
+	// non-zero exit status. This contract is relied upon by callers that inspect
+	// output text (for example searching for an "ERROR:" prefix) as well as
+	// the returned error value.
+	Run(cmd string) (string, error)
+}
+
+// EnsureAzCliLogin ensures az CLI is available and attempts to auto-login using environment variables
+func EnsureAzCliLogin(cfg *config.ConfigData) (string, error) {
+	if _, err := exec.LookPath("az"); err != nil {
+		return "", fmt.Errorf("az cli is not installed or not in PATH: %w", err)
+	}
+	proc := NewShellProc(cfg.Timeout)
+	return EnsureAzCliLoginWithProc(proc, cfg)
+}
+
+// NewShellProc is a package-level Proc factory used so tests can override process creation and avoid invoking the real `az` binary.
+var NewShellProc = func(timeout int) Proc {
+	return command.NewShellProcess("az", timeout)
+}
+
+// EnsureAzCliLoginWithProc is the testable implementation that uses an injected Proc.
+func EnsureAzCliLoginWithProc(proc Proc, cfg *config.ConfigData) (string, error) {
+	// If there's a valid account, skip auto-login.
+	out, err := proc.Run("account show --query id -o tsv")
+	if err == nil && strings.TrimSpace(out) != "" {
+		return AuthTypeExisting, nil
+	}
+
+	// Read environment variables to determine which auth methods to try first.
+	tenantID := os.Getenv("AZURE_TENANT_ID")
+	clientID := os.Getenv("AZURE_CLIENT_ID")
+	clientSecret := os.Getenv("AZURE_CLIENT_SECRET")
+	federatedTokenFile := os.Getenv("AZURE_FEDERATED_TOKEN_FILE")
+	subscriptionID := os.Getenv("AZURE_SUBSCRIPTION_ID")
+
+	// 1) Service Principal with secret
+	if clientID != "" && clientSecret != "" && tenantID != "" {
+		if err := runLoginCommand(proc, fmt.Sprintf("login --service-principal -u %s -p %s --tenant %s", clientID, clientSecret, tenantID), "service principal"); err != nil {
+			return "", err
+		}
+		if err := setSubscription(proc, subscriptionID, "service principal"); err != nil {
+			return "", err
+		}
+		if err := showAccount(proc, "service principal"); err != nil {
+			return "", err
+		}
+		return AuthTypeServicePrincipal, nil
+	}
+
+	// 2) Workload Identity (federated token)
+	if clientID != "" && tenantID != "" && federatedTokenFile != "" {
+		federatedTokenData, err := os.ReadFile(federatedTokenFile)
+		if err != nil {
+			return "", fmt.Errorf("failed to read federated token file %s: %w", federatedTokenFile, err)
+		}
+		federatedToken := strings.TrimSpace(string(federatedTokenData))
+		if federatedToken == "" {
+			return "", fmt.Errorf("federated token file %s is empty", federatedTokenFile)
+		}
+		if err := runLoginCommand(proc, fmt.Sprintf("login --service-principal -u %s --tenant %s --federated-token %s", clientID, tenantID, federatedToken), "federated token"); err != nil {
+			return "", err
+		}
+		if err := setSubscription(proc, subscriptionID, "federated token"); err != nil {
+			return "", err
+		}
+		if err := showAccount(proc, "federated token"); err != nil {
+			return "", err
+		}
+		return AuthTypeFederatedToken, nil
+	}
+
+	// 3) User-assigned Managed Identity (client ID provided)
+	if clientID != "" {
+		if err := runLoginCommand(proc, fmt.Sprintf("login --identity -u %s", clientID), "user-assigned managed identity"); err != nil {
+			return "", err
+		}
+		if err := setSubscription(proc, subscriptionID, "user-assigned managed identity"); err != nil {
+			return "", err
+		}
+		if err := showAccount(proc, "user-assigned managed identity"); err != nil {
+			return "", err
+		}
+		return AuthTypeUserAssignedManagedID, nil
+	}
+
+	// 4) Fallback to System-assigned Managed Identity even when no AZURE_* hints are set.
+	if err := runLoginCommand(proc, "login --identity", "system-assigned managed identity"); err != nil {
+		return "", err
+	}
+	if err := setSubscription(proc, subscriptionID, "system-assigned managed identity"); err != nil {
+		return "", err
+	}
+	if err := showAccount(proc, "system-assigned managed identity"); err != nil {
+		return "", err
+	}
+	return AuthTypeSystemAssignedManagedID, nil
+}
+
+// Runs a command and returns a formatted error if the output indicates an ERROR or the command failed.
+func runLoginCommand(proc Proc, cmd string, loginMethod string) error {
+	// proc.Run is expected to return combined stdout+stderr. Some `az`
+	// subcommands write human-readable error text to stderr (which will be
+	// included in the returned string). We therefore inspect the returned
+	// output for an "ERROR:" prefix as a quick check for failure messages,
+	// and also respect the returned error (which should be non-nil for
+	// non-zero exit codes).
+	out, err := proc.Run(cmd)
+	if strings.HasPrefix(strings.TrimSpace(out), "ERROR:") {
+		return fmt.Errorf("%s login failed: %s", loginMethod, out)
+	}
+	if err != nil {
+		return fmt.Errorf("%s login failed: %w", loginMethod, err)
+	}
+	return nil
+}
+
+// Sets the subscription when provided and wraps errors with context.
+func setSubscription(proc Proc, subscriptionID, loginMethod string) error {
+	if subscriptionID == "" {
+		return nil
+	}
+	if _, err := proc.Run(fmt.Sprintf("account set --subscription %s", subscriptionID)); err != nil {
+		return fmt.Errorf("%s login failed: %w", loginMethod, err)
+	}
+	return nil
+}
+
+// Checks that account info is returned after a login attempt.
+func showAccount(proc Proc, loginMethod string) error {
+	if _, err := proc.Run("account show --query id -o tsv"); err != nil {
+		return fmt.Errorf("%s login failed: %w", loginMethod, err)
+	}
+	return nil
+}

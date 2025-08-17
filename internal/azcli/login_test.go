@@ -1,0 +1,320 @@
+package azcli
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/Azure/aks-mcp/internal/config"
+)
+
+// Command to be run and expected output/error
+type loginCommandResponses struct {
+	cmd string
+	out string
+	err error
+}
+
+// Interface to mock azcli commands in tests
+type loginCommands struct {
+	idx  int
+	resp []loginCommandResponses
+}
+
+// Simulate running a command and return the expected output/error
+func (c *loginCommands) Run(cmd string) (string, error) {
+	if c.idx >= len(c.resp) {
+		return "", fmt.Errorf("no more responses, unexpected command: %s", cmd)
+	}
+	expected := c.resp[c.idx]
+	c.idx++
+	// match prefix so tests are less brittle
+	if expected.cmd != "" && !strings.HasPrefix(cmd, expected.cmd) {
+		return "", fmt.Errorf("expected cmd prefix %q but got %q", expected.cmd, cmd)
+	}
+	return expected.out, expected.err
+}
+
+func TestEnsureAzCliLogin_Existing(t *testing.T) {
+	cfg := config.NewConfig()
+	// ensure auto-login is attempted
+	t.Setenv("AZURE_CLIENT_ID", "cid")
+
+	// add command to simulate existing_login
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "sub-id", err: nil},
+	}}
+
+	// should return existing_login without error
+	got, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got != "existing_login" {
+		t.Fatalf("unexpected result: %s", got)
+	}
+}
+
+func TestEnsureAzCliLogin_ServicePrincipal(t *testing.T) {
+	cfg := config.NewConfig()
+	// set envs for service principal (dummy values for testing only)
+	t.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
+	t.Setenv("AZURE_CLIENT_SECRET", "dummy-client-secret")
+	t.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
+	// To exercise the login flow we must simulate probe failing (not logged in)
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
+		// login command succeeds (matches dummy env values)
+		{cmd: "login --service-principal -u dummy-client-id -p dummy-client-secret --tenant dummy-tenant-id", out: "", err: nil},
+		// re-probe succeeds
+		{cmd: "account show --query id -o tsv", out: "sub-id", err: nil},
+	}}
+	got, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got != "service_principal" {
+		t.Fatalf("unexpected result: %s", got)
+	}
+}
+
+func TestEnsureAzCliLogin_ServicePrincipal_ErrorOutput(t *testing.T) {
+	cfg := config.NewConfig()
+	t.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
+	t.Setenv("AZURE_CLIENT_SECRET", "dummy-client-secret")
+	t.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
+	// probe fails so login attempt is performed
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
+		// login returns an ERROR: prefixed message on stderr (simulated via out)
+		{cmd: "login --service-principal -u dummy-client-id -p dummy-client-secret --tenant dummy-tenant-id", out: "ERROR: something went wrong", err: nil},
+	}}
+	_, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err == nil || !strings.Contains(err.Error(), "service principal login failed: ERROR: something went wrong") {
+		t.Fatalf("expected service principal error containing ERROR:, got %v", err)
+	}
+}
+
+func TestEnsureAzCliLogin_ServicePrincipal_CommandError(t *testing.T) {
+	cfg := config.NewConfig()
+	t.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
+	t.Setenv("AZURE_CLIENT_SECRET", "dummy-client-secret")
+	t.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
+		// login command fails to execute
+		{cmd: "login --service-principal -u dummy-client-id -p dummy-client-secret --tenant dummy-tenant-id", out: "", err: errors.New("exec failed")},
+	}}
+	_, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err == nil || !strings.Contains(err.Error(), "service principal login failed") {
+		t.Fatalf("expected wrapped service principal error, got %v", err)
+	}
+}
+
+func TestEnsureAzCliLogin_NoAutoLogin(t *testing.T) {
+	cfg := config.NewConfig()
+	// ensure no AZURE_* env vars (explicitly clear for this test)
+	t.Setenv("AZURE_CLIENT_ID", "")
+	t.Setenv("AZURE_CLIENT_SECRET", "")
+	t.Setenv("AZURE_TENANT_ID", "")
+	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", "")
+	t.Setenv("AZURE_SUBSCRIPTION_ID", "")
+
+	// proc should not be called; queueProc with no responses will fail if Run is invoked
+	p := &loginCommands{resp: []loginCommandResponses{}}
+
+	got, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err == nil {
+		t.Fatalf("expected error when no automatic credentials are set, got success: %s", got)
+	}
+}
+
+func TestEnsureAzCliLogin_SubscriptionSetFailure(t *testing.T) {
+	cfg := config.NewConfig()
+	t.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
+	t.Setenv("AZURE_CLIENT_SECRET", "dummy-client-secret")
+	t.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
+	t.Setenv("AZURE_SUBSCRIPTION_ID", "dummy-subscription-id")
+
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
+		{cmd: "login --service-principal -u dummy-client-id -p dummy-client-secret --tenant dummy-tenant-id", out: "", err: nil},
+		// account set fails
+		{cmd: "account set --subscription dummy-subscription-id", out: "", err: errors.New("set failed")},
+	}}
+
+	_, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err == nil || !strings.Contains(err.Error(), "service principal login failed") {
+		t.Fatalf("expected subscription set failure wrapped in service principal context, got %v", err)
+	}
+}
+
+func TestEnsureAzCliLogin_ReprobeFailure(t *testing.T) {
+	cfg := config.NewConfig()
+	t.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
+	t.Setenv("AZURE_CLIENT_SECRET", "dummy-client-secret")
+	t.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
+	t.Setenv("AZURE_SUBSCRIPTION_ID", "dummy-subscription-id")
+
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
+		{cmd: "login --service-principal -u dummy-client-id -p dummy-client-secret --tenant dummy-tenant-id", out: "", err: nil},
+		{cmd: "account set --subscription dummy-subscription-id", out: "", err: nil},
+		// re-probe fails
+		{cmd: "account show --query id -o tsv", out: "", err: errors.New("probe failed")},
+	}}
+
+	_, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err == nil || !strings.Contains(err.Error(), "service principal login failed") {
+		t.Fatalf("expected reprobe failure wrapped in service principal context, got %v", err)
+	}
+}
+
+func TestEnsureAzCliLogin_Federated(t *testing.T) {
+	cfg := config.NewConfig()
+	t.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
+	t.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
+	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", "/tmp/token")
+
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
+		{cmd: "login --service-principal -u dummy-client-id --tenant dummy-tenant-id --federated-token /tmp/token", out: "", err: nil},
+		{cmd: "account show --query id -o tsv", out: "sub-id", err: nil},
+	}}
+
+	got, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err == nil && got == "federated_token" {
+		t.Fatalf("unexpected result: %s", got)
+	}
+}
+
+func TestEnsureAzCliLogin_Federated_Success(t *testing.T) {
+	cfg := config.NewConfig()
+	t.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
+	t.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
+
+	// Create a dummy token file for testing
+	tokenFile, err := os.CreateTemp("", "federated-token-test-*")
+	if err != nil {
+		t.Fatalf("failed to create token file: %v", err)
+	}
+	defer func() {
+		_ = tokenFile.Close()
+		_ = os.Remove(tokenFile.Name())
+	}()
+	_, err = tokenFile.WriteString("dummy-federated-token")
+	if err != nil {
+		t.Fatalf("failed to write to token file: %v", err)
+	}
+	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", tokenFile.Name())
+
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
+		{cmd: "login --service-principal -u dummy-client-id --tenant dummy-tenant-id --federated-token dummy-federated-token", out: "", err: nil},
+		{cmd: "account show --query id -o tsv", out: "sub-id", err: nil},
+	}}
+
+	got, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got != "federated_token" {
+		t.Fatalf("unexpected result: %s", got)
+	}
+}
+
+func TestEnsureAzCliLogin_ManagedIdentity_UserAssigned(t *testing.T) {
+	cfg := config.NewConfig()
+	t.Setenv("AZURE_CLIENT_ID", "dummy-managed-identity-client-id")
+	t.Setenv("AZURE_SUBSCRIPTION_ID", "dummy-subscription-id")
+
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
+		{cmd: "login --identity -u dummy-managed-identity-client-id", out: "", err: nil},
+		{cmd: "account set --subscription dummy-subscription-id", out: "", err: nil},
+		{cmd: "account show --query id -o tsv", out: "sub-id", err: nil},
+	}}
+
+	got, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got != "user_assigned_managed_identity" {
+		t.Fatalf("unexpected result: %s", got)
+	}
+}
+
+func TestEnsureAzCliLogin_ManagedIdentity_SystemAssigned(t *testing.T) {
+	cfg := config.NewConfig()
+	// Clear all Azure env vars to test fallback to system-assigned MI
+	t.Setenv("AZURE_CLIENT_ID", "")
+	t.Setenv("AZURE_CLIENT_SECRET", "")
+	t.Setenv("AZURE_TENANT_ID", "")
+	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", "")
+	t.Setenv("AZURE_SUBSCRIPTION_ID", "")
+
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
+		{cmd: "login --identity", out: "", err: nil},
+		{cmd: "account show --query id -o tsv", out: "sub-id", err: nil},
+	}}
+
+	got, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got != "system_assigned_managed_identity" {
+		t.Fatalf("unexpected result: %s", got)
+	}
+}
+
+func TestEnsureAzCliLogin_ManagedIdentity_SystemAssigned_Success(t *testing.T) {
+	cfg := config.NewConfig()
+	// Fallback to system-assigned MI with subscription set
+	t.Setenv("AZURE_CLIENT_ID", "")
+	t.Setenv("AZURE_CLIENT_SECRET", "")
+	t.Setenv("AZURE_TENANT_ID", "")
+	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", "")
+	t.Setenv("AZURE_SUBSCRIPTION_ID", "dummy-subscription-id")
+
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
+		{cmd: "login --identity", out: "", err: nil},
+		{cmd: "account set --subscription dummy-subscription-id", out: "", err: nil},
+		{cmd: "account show --query id -o tsv", out: "sub-id", err: nil},
+	}}
+
+	got, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got != "system_assigned_managed_identity" {
+		t.Fatalf("unexpected result: %s", got)
+	}
+}
+
+func TestEnsureAzCliLogin_LoginPromptInOutput(t *testing.T) {
+	cfg := config.NewConfig()
+	// ensure auto-login is attempted
+	t.Setenv("AZURE_CLIENT_ID", "cid")
+
+	// Simulate the case where Azure CLI returns "Please run 'az login'" message with an error
+	// After the command.go fix, stderr content is returned WITH the error, not instead of it
+	// This test ensures we don't incorrectly think there's a valid login when there isn't
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "ERROR: Please run 'az login' to setup account.", err: errors.New("command failed")},
+		{cmd: "login --identity -u cid", out: "", err: nil},
+		{cmd: "account show --query id -o tsv", out: "sub-id", err: nil},
+	}}
+
+	// should NOT return existing_login, should proceed with authentication
+	got, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got != "user_assigned_managed_identity" {
+		t.Fatalf("unexpected result: %s", got)
+	}
+}

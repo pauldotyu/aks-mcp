@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/Azure/aks-mcp/internal/azcli"
 	"github.com/Azure/aks-mcp/internal/components/azaks"
 	"github.com/Azure/aks-mcp/internal/config"
 	"github.com/Azure/mcp-kubernetes/pkg/kubectl"
@@ -62,11 +63,12 @@ func (m *MockToolCounter) GetToolNames() []string {
 
 // TestService tests the service initialization and expected tool counts
 func TestService(t *testing.T) {
-	// Set environment variables for testing to avoid Azure auth issues
-	_ = os.Setenv("AZURE_TENANT_ID", "test-tenant")
-	_ = os.Setenv("AZURE_CLIENT_ID", "test-client")
-	_ = os.Setenv("AZURE_CLIENT_SECRET", "test-secret")
-	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "test-subscription")
+	// Set environment variables for testing to avoid Azure auth issues.
+	// These are dummy values for tests only — do not commit real credentials here.
+	_ = os.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
+	_ = os.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
+	_ = os.Setenv("AZURE_CLIENT_SECRET", "dummy-client-secret")
+	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "dummy-subscription-id")
 	defer func() {
 		_ = os.Unsetenv("AZURE_TENANT_ID")
 		_ = os.Unsetenv("AZURE_CLIENT_ID")
@@ -121,6 +123,12 @@ func TestService(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Create test configuration
+			cfg := createTestConfig(tt.accessLevel, tt.additionalTools)
+
+			// Create service with injected fake Proc factory so Initialize doesn't call the real az binary
+			service := NewService(cfg, WithAzCliProcFactory(func(timeout int) azcli.Proc { return &fakeProc{} }))
+
 			// Calculate expected kubectl tools count
 			kubectlTools := kubectl.RegisterKubectlTools(tt.accessLevel)
 			expectedKubectlCount := len(kubectlTools)
@@ -142,11 +150,10 @@ func TestService(t *testing.T) {
 			t.Logf("Expected total K8s tools: %d", expectedTotalK8sTools)
 			t.Logf("Expected Azure tools: %d", tt.expectedAzureTools)
 
-			// Create test configuration
-			cfg := createTestConfig(tt.accessLevel, tt.additionalTools)
-
-			// Create service
-			service := NewService(cfg)
+			// If service wasn't created above (some test paths), create it with the fake factory
+			if service == nil {
+				service = NewService(cfg, WithAzCliProcFactory(func(timeout int) azcli.Proc { return &fakeProc{} }))
+			}
 
 			// Verify service was created properly
 			if service == nil { //nolint:staticcheck // False positive: t.Fatal prevents nil dereference
@@ -169,6 +176,18 @@ func TestService(t *testing.T) {
 			t.Logf("Service initialized successfully for access level: %s", tt.accessLevel)
 		})
 	}
+}
+
+// fakeProc is a minimal Proc implementation for tests.
+type fakeProc struct{}
+
+func (f *fakeProc) Run(cmd string) (string, error) {
+	// For probing account show, return a non-error id
+	if cmd == "account show --query id -o tsv" {
+		return "00000000-0000-0000-0000-000000000000", nil
+	}
+	// For any other command, return empty output and nil error to simulate success
+	return "", nil
 }
 
 // TestComponentToolCounts tests individual component tool registration counts
@@ -250,11 +269,11 @@ func TestAKSOperationsAccess(t *testing.T) {
 
 // TestServiceInitialization tests basic service initialization
 func TestServiceInitialization(t *testing.T) {
-	// Set test environment variables
-	_ = os.Setenv("AZURE_TENANT_ID", "test-tenant")
-	_ = os.Setenv("AZURE_CLIENT_ID", "test-client")
-	_ = os.Setenv("AZURE_CLIENT_SECRET", "test-secret")
-	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "test-subscription")
+	// Set test environment variables (dummy values)
+	_ = os.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
+	_ = os.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
+	_ = os.Setenv("AZURE_CLIENT_SECRET", "dummy-client-secret")
+	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "dummy-subscription-id")
 	defer func() {
 		_ = os.Unsetenv("AZURE_TENANT_ID")
 		_ = os.Unsetenv("AZURE_CLIENT_ID")
@@ -263,7 +282,7 @@ func TestServiceInitialization(t *testing.T) {
 	}()
 
 	cfg := createTestConfig("readonly", map[string]bool{})
-	service := NewService(cfg)
+	service := NewService(cfg, WithAzCliProcFactory(func(timeout int) azcli.Proc { return &fakeProc{} }))
 
 	// Test service creation - must be non-nil
 	if service == nil { //nolint:staticcheck // False positive: t.Fatal prevents nil dereference
@@ -347,11 +366,11 @@ func containsPrefix(s string, prefix string) bool {
 
 // BenchmarkServiceInitialization benchmarks service initialization
 func BenchmarkServiceInitialization(b *testing.B) {
-	// Set test environment variables
-	_ = os.Setenv("AZURE_TENANT_ID", "test-tenant")
-	_ = os.Setenv("AZURE_CLIENT_ID", "test-client")
-	_ = os.Setenv("AZURE_CLIENT_SECRET", "test-secret")
-	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "test-subscription")
+	// Set test environment variables for benchmark (dummy values)
+	_ = os.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
+	_ = os.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
+	_ = os.Setenv("AZURE_CLIENT_SECRET", "dummy-client-secret")
+	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "dummy-subscription-id")
 	defer func() {
 		_ = os.Unsetenv("AZURE_TENANT_ID")
 		_ = os.Unsetenv("AZURE_CLIENT_ID")
@@ -363,7 +382,7 @@ func BenchmarkServiceInitialization(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		service := NewService(cfg)
+		service := NewService(cfg, WithAzCliProcFactory(func(timeout int) azcli.Proc { return &fakeProc{} }))
 		err := service.Initialize()
 		if err != nil {
 			b.Fatalf("Initialize failed: %v", err)
