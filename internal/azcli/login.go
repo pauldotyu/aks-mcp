@@ -4,6 +4,7 @@ package azcli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -20,6 +21,22 @@ const (
 	AuthTypeUserAssignedManagedID   = "user_assigned_managed_identity"
 	AuthTypeSystemAssignedManagedID = "system_assigned_managed_identity"
 )
+
+// validateFederatedTokenFile only allows the fixed AKS identity token path.
+func validateFederatedTokenFile(filePath string) (string, error) {
+	const allowedTokenPath = "/var/run/secrets/azure/tokens/azure-identity-token" // #nosec G101 -- not a credential, this is a fixed AKS token path
+	if filePath != allowedTokenPath {
+		return "", fmt.Errorf("federated token file path must be exactly %s", allowedTokenPath)
+	}
+	fileInfo, err := os.Stat(allowedTokenPath)
+	if err != nil {
+		return "", fmt.Errorf("cannot stat federated token file %s: %w", allowedTokenPath, err)
+	}
+	if !fileInfo.Mode().IsRegular() {
+		return "", fmt.Errorf("federated token file is not a regular file: %s", allowedTokenPath)
+	}
+	return allowedTokenPath, nil
+}
 
 // Proc is a minimal interface used by this package so tests can inject a fake process.
 type Proc interface {
@@ -78,13 +95,29 @@ func EnsureAzCliLoginWithProc(proc Proc, cfg *config.ConfigData) (string, error)
 
 	// 2) Workload Identity (federated token)
 	if clientID != "" && tenantID != "" && federatedTokenFile != "" {
-		federatedTokenData, err := os.ReadFile(federatedTokenFile)
+		// Validate the federated token file path for security and get canonical path
+		validatedPath, err := validateFederatedTokenFile(federatedTokenFile)
 		if err != nil {
-			return "", fmt.Errorf("failed to read federated token file %s: %w", federatedTokenFile, err)
+			return "", fmt.Errorf("federated token file validation failed: %w", err)
 		}
-		federatedToken := strings.TrimSpace(string(federatedTokenData))
+
+		// Open the only allowed federated token file (fixed path, safe)
+		f, err := os.Open(validatedPath) // #nosec G304 -- validated fixed path, not user-controlled
+		if err != nil {
+			return "", fmt.Errorf("failed to open federated token file %s: %w", validatedPath, err)
+		}
+		defer f.Close()
+
+		// Limit token size to 16KB which is far larger than typical JWT or k8s tokens
+		// but protects against very large files.
+		const maxTokenSize = 16 * 1024
+		data, err := io.ReadAll(io.LimitReader(f, maxTokenSize))
+		if err != nil {
+			return "", fmt.Errorf("failed to read federated token file %s: %w", validatedPath, err)
+		}
+		federatedToken := strings.TrimSpace(string(data))
 		if federatedToken == "" {
-			return "", fmt.Errorf("federated token file %s is empty", federatedTokenFile)
+			return "", fmt.Errorf("federated token file %s is empty", validatedPath)
 		}
 		if err := runLoginCommand(proc, fmt.Sprintf("login --service-principal -u %s --tenant %s --federated-token %s", clientID, tenantID, federatedToken), "federated token"); err != nil {
 			return "", err

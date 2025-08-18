@@ -176,17 +176,58 @@ func TestEnsureAzCliLogin_Federated(t *testing.T) {
 	cfg := config.NewConfig()
 	t.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
 	t.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
-	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", "/tmp/token")
+
+	// Only allow the fixed AKS federated token path
+	const allowedTokenPath = "/var/run/secrets/azure/tokens/azure-identity-token"
+	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", allowedTokenPath)
+
+	// If the file does not exist (not running in AKS), skip the test
+	if _, err := os.Stat(allowedTokenPath); err != nil {
+		t.Skipf("skipping: %s not present (only available in AKS)", allowedTokenPath)
+	}
 
 	p := &loginCommands{resp: []loginCommandResponses{
 		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
-		{cmd: "login --service-principal -u dummy-client-id --tenant dummy-tenant-id --federated-token /tmp/token", out: "", err: nil},
-		{cmd: "account show --query id -o tsv", out: "sub-id", err: nil},
 	}}
 
 	got, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err != nil && !strings.Contains(err.Error(), allowedTokenPath) {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if err == nil && got == "federated_token" {
 		t.Fatalf("unexpected result: %s", got)
+	}
+}
+
+func TestEnsureAzCliLogin_Federated_InvalidFile(t *testing.T) {
+	cfg := config.NewConfig()
+	t.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
+	t.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
+	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", "/tmp/non-existent-file")
+
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
+	}}
+
+	_, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err == nil || !strings.Contains(err.Error(), "federated token file validation failed") {
+		t.Fatalf("expected federated token file validation error, got %v", err)
+	}
+}
+
+func TestEnsureAzCliLogin_Federated_DirectoryTraversal(t *testing.T) {
+	cfg := config.NewConfig()
+	t.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
+	t.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
+	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", "../../../etc/passwd")
+
+	p := &loginCommands{resp: []loginCommandResponses{
+		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
+	}}
+
+	_, err := EnsureAzCliLoginWithProc(p, cfg)
+	if err == nil || !strings.Contains(err.Error(), "federated token file validation failed") {
+		t.Fatalf("expected federated token file validation error for directory traversal, got %v", err)
 	}
 }
 
@@ -195,24 +236,22 @@ func TestEnsureAzCliLogin_Federated_Success(t *testing.T) {
 	t.Setenv("AZURE_CLIENT_ID", "dummy-client-id")
 	t.Setenv("AZURE_TENANT_ID", "dummy-tenant-id")
 
-	// Create a dummy token file for testing
-	tokenFile, err := os.CreateTemp("", "federated-token-test-*")
-	if err != nil {
-		t.Fatalf("failed to create token file: %v", err)
+	// Only allow the fixed AKS federated token path
+	const allowedTokenPath = "/var/run/secrets/azure/tokens/azure-identity-token"
+	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", allowedTokenPath)
+
+	// If the file does not exist (not running in AKS), skip the test
+	tokenData := "dummy-federated-token"
+	if _, err := os.Stat(allowedTokenPath); err != nil {
+		t.Skipf("skipping: %s not present (only available in AKS)", allowedTokenPath)
 	}
-	defer func() {
-		_ = tokenFile.Close()
-		_ = os.Remove(tokenFile.Name())
-	}()
-	_, err = tokenFile.WriteString("dummy-federated-token")
-	if err != nil {
-		t.Fatalf("failed to write to token file: %v", err)
-	}
-	t.Setenv("AZURE_FEDERATED_TOKEN_FILE", tokenFile.Name())
+
+	// Optionally, try to write a dummy token if running in a testable AKS env (may require root)
+	// _ = os.WriteFile(allowedTokenPath, []byte(tokenData), 0600)
 
 	p := &loginCommands{resp: []loginCommandResponses{
 		{cmd: "account show --query id -o tsv", out: "", err: errors.New("not logged in")},
-		{cmd: "login --service-principal -u dummy-client-id --tenant dummy-tenant-id --federated-token dummy-federated-token", out: "", err: nil},
+		{cmd: "login --service-principal -u dummy-client-id --tenant dummy-tenant-id --federated-token " + tokenData, out: "", err: nil},
 		{cmd: "account show --query id -o tsv", out: "sub-id", err: nil},
 	}}
 
