@@ -28,7 +28,6 @@ func RegisterInspektorGadgetTool() mcp.Tool {
 		),
 		mcp.WithObject("action_params",
 			mcp.Description("Parameters for the action"),
-			mcp.Required(),
 			mcp.Properties(map[string]any{
 				"gadget_name": map[string]any{
 					"type":        "string",
