@@ -106,7 +106,11 @@ func EnsureAzCliLoginWithProc(proc Proc, cfg *config.ConfigData) (string, error)
 		if err != nil {
 			return "", fmt.Errorf("failed to open federated token file %s: %w", validatedPath, err)
 		}
-		defer f.Close()
+		defer func() {
+			if err := f.Close(); err != nil {
+				fmt.Fprintf(os.Stderr, "error closing file: %v\n", err)
+			}
+		}()
 
 		// Limit token size to 16KB which is far larger than typical JWT or k8s tokens
 		// but protects against very large files.
