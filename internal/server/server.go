@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/Azure/aks-mcp/internal/azcli"
 	"github.com/Azure/aks-mcp/internal/azureclient"
@@ -127,13 +128,16 @@ func (s *Service) createCustomHTTPServerWithHelp404(addr string) *http.Server {
 				},
 			}
 
-			json.NewEncoder(w).Encode(response)
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			}
 		}
 	})
 
 	return &http.Server{
-		Addr:    addr,
-		Handler: mux,
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 }
 
@@ -161,13 +165,16 @@ func (s *Service) createCustomSSEServerWithHelp404(sseServer *server.SSEServer, 
 				},
 			}
 
-			json.NewEncoder(w).Encode(response)
+			if err := json.NewEncoder(w).Encode(response); err != nil {
+				http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			}
 		}
 	})
 
 	return &http.Server{
-		Addr:    addr,
-		Handler: mux,
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 }
 
