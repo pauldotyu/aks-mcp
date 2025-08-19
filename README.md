@@ -19,6 +19,39 @@ AI assistants can use to interact with AKS resources. It leverages the Model
 Context Protocol (MCP) to facilitate this communication, enabling AI tools to
 make API calls to Azure and interpret the responses.
 
+## Azure CLI Authentication
+
+AKS-MCP uses Azure CLI (az) for AKS operations. Azure CLI authentication is attempted in this order:
+
+1. Service Principal (client secret): When `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID` environment variables are present, a service principal login is performed using the following command: `az login --service-principal -u CLIENT_ID -p CLIENT_SECRET --tenant TENANT_ID`
+
+1. Workload Identity (federated token): When `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_FEDERATED_TOKEN_FILE` environment variables are present, a federated token login is performed using the following command: `az login --service-principal -u CLIENT_ID --tenant TENANT_ID --federated-token TOKEN`
+
+1. User-assigned Managed Identity (managed identity client ID): When only `AZURE_CLIENT_ID` environment variable is present, a user-assigned managed identity login is performed using the following command: `az login --identity -u CLIENT_ID`
+
+1. System-assigned Managed Identity: When `AZURE_MANAGED_IDENTITY` is set to `system`, a system-assigned managed identity login is performed using the following command: `az login --identity`
+
+1. Existing Login: When none of the above environment variables are set, AKS-MCP assumes you have already authenticated (for example, via `az login`) and uses the existing session.
+
+Optional subscription selection:
+
+- If `AZURE_SUBSCRIPTION_ID` is set, AKS-MCP will run `az account set --subscription SUBSCRIPTION_ID` after login.
+
+Notes and security:
+
+- The federated token file must be exactly `/var/run/secrets/azure/tokens/azure-identity-token` and is strictly validated; other paths are rejected.
+- After each login, AKS-MCP verifies authentication with `az account show --query id -o tsv`.
+- Ensure the Azure CLI is installed and on PATH.
+
+Environment variables used:
+
+- `AZURE_TENANT_ID`
+- `AZURE_CLIENT_ID`
+- `AZURE_CLIENT_SECRET`
+- `AZURE_FEDERATED_TOKEN_FILE`
+- `AZURE_SUBSCRIPTION_ID`
+- `AZURE_MANAGED_IDENTITY` (set to `system` to opt into system-assigned managed identity)
+
 ## Available Tools
 
 The AKS-MCP server provides consolidated tools for interacting with AKS
