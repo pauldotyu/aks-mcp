@@ -66,18 +66,13 @@ var NewShellProc = func(timeout int) Proc {
 
 // EnsureAzCliLoginWithProc is the testable implementation that uses an injected Proc.
 func EnsureAzCliLoginWithProc(proc Proc, cfg *config.ConfigData) (string, error) {
-	// If there's a valid account, skip auto-login.
-	out, err := proc.Run("account show --query id -o tsv")
-	if err == nil && strings.TrimSpace(out) != "" {
-		return AuthTypeExisting, nil
-	}
-
-	// Read environment variables to determine which auth methods to try first.
+	// Read environment variables to determine which auth methods to try
 	tenantID := os.Getenv("AZURE_TENANT_ID")
 	clientID := os.Getenv("AZURE_CLIENT_ID")
 	clientSecret := os.Getenv("AZURE_CLIENT_SECRET")
 	federatedTokenFile := os.Getenv("AZURE_FEDERATED_TOKEN_FILE")
 	subscriptionID := os.Getenv("AZURE_SUBSCRIPTION_ID")
+	azureManagedIdentityType := os.Getenv("AZURE_MANAGED_IDENTITY")
 
 	// 1) Service Principal with secret
 	if clientID != "" && clientSecret != "" && tenantID != "" {
@@ -149,17 +144,22 @@ func EnsureAzCliLoginWithProc(proc Proc, cfg *config.ConfigData) (string, error)
 		return AuthTypeUserAssignedManagedID, nil
 	}
 
-	// 4) Fallback to System-assigned Managed Identity even when no AZURE_* hints are set.
-	if err := runLoginCommand(proc, "login --identity", "system-assigned managed identity"); err != nil {
-		return "", err
+	// 4) System-assigned Managed Identity
+	if azureManagedIdentityType == "system" {
+		if err := runLoginCommand(proc, "login --identity", "system-assigned managed identity"); err != nil {
+			return "", err
+		}
+		if err := setSubscription(proc, subscriptionID, "system-assigned managed identity"); err != nil {
+			return "", err
+		}
+		if err := showAccount(proc, "system-assigned managed identity"); err != nil {
+			return "", err
+		}
+		return AuthTypeSystemAssignedManagedID, nil
 	}
-	if err := setSubscription(proc, subscriptionID, "system-assigned managed identity"); err != nil {
-		return "", err
-	}
-	if err := showAccount(proc, "system-assigned managed identity"); err != nil {
-		return "", err
-	}
-	return AuthTypeSystemAssignedManagedID, nil
+
+	// 5) Existing login (no credentials override provided)
+	return AuthTypeExisting, nil
 }
 
 // Runs a command and returns a formatted error if the output indicates an ERROR or the command failed.
