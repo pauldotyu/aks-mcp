@@ -1,8 +1,10 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/Azure/aks-mcp/internal/azcli"
 	"github.com/Azure/aks-mcp/internal/azureclient"
@@ -103,6 +105,72 @@ func (s *Service) registerPrompts() {
 	prompts.RegisterHealthPrompts(s.mcpServer, s.cfg)
 }
 
+// createCustomHTTPServerWithHelp404 creates a custom HTTP server that provides
+// helpful 404 responses for the MCP server
+func (s *Service) createCustomHTTPServerWithHelp404(addr string) *http.Server {
+	mux := http.NewServeMux()
+
+	// Handle all other paths with a helpful 404 response
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/mcp" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+
+			response := map[string]interface{}{
+				"error":   "Not Found",
+				"message": "This is an MCP (Model Context Protocol) server. Please send POST requests to /mcp to initialize a session and obtain an Mcp-Session-Id for subsequent requests.",
+				"endpoints": map[string]string{
+					"initialize": "POST /mcp - Initialize MCP session",
+					"requests":   "POST /mcp - Send MCP requests (requires Mcp-Session-Id header)",
+					"listen":     "GET /mcp - Listen for notifications (requires Mcp-Session-Id header)",
+					"terminate":  "DELETE /mcp - Terminate session (requires Mcp-Session-Id header)",
+				},
+			}
+
+			json.NewEncoder(w).Encode(response)
+		}
+	})
+
+	return &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+}
+
+// createCustomSSEServerWithHelp404 creates a custom HTTP server for SSE that provides
+// helpful 404 responses for non-MCP endpoints
+func (s *Service) createCustomSSEServerWithHelp404(sseServer *server.SSEServer, addr string) *http.Server {
+	mux := http.NewServeMux()
+
+	// Register SSE and Message handlers
+	mux.Handle("/sse", sseServer.SSEHandler())
+	mux.Handle("/message", sseServer.MessageHandler())
+
+	// Handle all other paths with a helpful 404 response
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/sse" && r.URL.Path != "/message" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+
+			response := map[string]interface{}{
+				"error":   "Not Found",
+				"message": "This is an MCP (Model Context Protocol) server using SSE transport. Use the SSE endpoint to establish connections and the message endpoint to send requests.",
+				"endpoints": map[string]string{
+					"sse":     "GET /sse - Establish SSE connection for real-time notifications",
+					"message": "POST /message - Send MCP JSON-RPC messages",
+				},
+			}
+
+			json.NewEncoder(w).Encode(response)
+		}
+	})
+
+	return &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+}
+
 // Run starts the service with the specified transport
 func (s *Service) Run() error {
 	log.Println("AKS MCP version:", version.GetVersion())
@@ -114,15 +182,42 @@ func (s *Service) Run() error {
 		log.Println("Listening for requests on STDIO...")
 		return server.ServeStdio(s.mcpServer)
 	case "sse":
+		addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
+
+		// Create SSE server first
 		sse := server.NewSSEServer(s.mcpServer)
-		addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
+
+		// Create custom HTTP server with helpful 404 responses
+		customServer := s.createCustomSSEServerWithHelp404(sse, addr)
+
 		log.Printf("SSE server listening on %s", addr)
-		return sse.Start(addr)
+		log.Printf("SSE endpoint available at: http://%s/sse", addr)
+		log.Printf("Message endpoint available at: http://%s/message", addr)
+		log.Printf("Connect to /sse for real-time events, send JSON-RPC to /message")
+
+		return customServer.ListenAndServe()
 	case "streamable-http":
-		streamableServer := server.NewStreamableHTTPServer(s.mcpServer)
 		addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
+
+		// Create a custom HTTP server with helpful 404 responses
+		customServer := s.createCustomHTTPServerWithHelp404(addr)
+
+		// Create the streamable HTTP server with the custom HTTP server
+		streamableServer := server.NewStreamableHTTPServer(
+			s.mcpServer,
+			server.WithStreamableHTTPServer(customServer),
+		)
+
+		// Update the mux to use the actual streamable server as the MCP handler
+		if mux, ok := customServer.Handler.(*http.ServeMux); ok {
+			mux.Handle("/mcp", streamableServer)
+		}
+
 		log.Printf("Streamable HTTP server listening on %s", addr)
-		return streamableServer.Start(addr)
+		log.Printf("MCP endpoint available at: http://%s/mcp", addr)
+		log.Printf("Send POST requests to /mcp to initialize session and obtain Mcp-Session-Id")
+
+		return customServer.ListenAndServe()
 	default:
 		return fmt.Errorf("invalid transport type: %s (must be 'stdio', 'sse' or 'streamable-http')", s.cfg.Transport)
 	}
