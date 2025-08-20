@@ -82,7 +82,7 @@ func (s *ShellProcess) Exec(commands string) (string, error) {
 	// Handle errors
 	if err != nil {
 		if s.ReturnErrOutput && stderr.Len() > 0 {
-			return stderr.String(), nil
+			return stderr.String(), err
 		}
 		return "", err
 	}

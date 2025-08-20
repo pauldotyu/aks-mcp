@@ -31,16 +31,29 @@ import (
 
 // Service represents the AKS MCP service
 type Service struct {
-	cfg       *config.ConfigData
-	mcpServer *server.MCPServer
-	azClient  *azureclient.AzureClient
+	cfg              *config.ConfigData
+	mcpServer        *server.MCPServer
+	azClient         *azureclient.AzureClient
+	azcliProcFactory func(timeout int) azcli.Proc
 }
 
-// NewService creates a new AKS MCP service
-func NewService(cfg *config.ConfigData) *Service {
-	return &Service{
-		cfg: cfg,
+// ServiceOption defines a function that configures the AKS MCP service
+type ServiceOption func(*Service)
+
+// WithAzCliProcFactory allows callers to inject a Proc factory for azcli execution.
+// The factory returns an azcli.Proc which can be faked in tests.
+func WithAzCliProcFactory(f func(timeout int) azcli.Proc) ServiceOption {
+	return func(s *Service) { s.azcliProcFactory = f }
+}
+
+// NewService creates a new AKS MCP service with the provided configuration and options.
+// Options can be used to inject dependencies like azcli execution factories.
+func NewService(cfg *config.ConfigData, opts ...ServiceOption) *Service {
+	s := &Service{cfg: cfg}
+	for _, opt := range opts {
+		opt(s)
 	}
+	return s
 }
 
 // Initialize initializes the service
@@ -64,10 +77,27 @@ func (s *Service) initializeInfrastructure() error {
 	// Create shared Azure client
 	azClient, err := azureclient.NewAzureClient(s.cfg)
 	if err != nil {
-		return fmt.Errorf("failed to create Azure client: %v", err)
+		return fmt.Errorf("failed to create Azure client: %w", err)
 	}
 	s.azClient = azClient
 	log.Println("Azure client initialized successfully")
+
+	// Ensure Azure CLI exists and is logged in
+	if s.azcliProcFactory != nil {
+		// Use injected factory to create an azcli.Proc
+		proc := s.azcliProcFactory(s.cfg.Timeout)
+		if loginType, err := azcli.EnsureAzCliLoginWithProc(proc, s.cfg); err != nil {
+			return fmt.Errorf("azure cli authentication failed: %w", err)
+		} else {
+			log.Printf("Azure CLI initialized successfully (%s)", loginType)
+		}
+	} else {
+		if loginType, err := azcli.EnsureAzCliLogin(s.cfg); err != nil {
+			return fmt.Errorf("azure cli authentication failed: %w", err)
+		} else {
+			log.Printf("Azure CLI initialized successfully (%s)", loginType)
+		}
+	}
 
 	// Create MCP server
 	s.mcpServer = server.NewMCPServer(
@@ -185,7 +215,6 @@ func (s *Service) Run() error {
 	// Start the server
 	switch s.cfg.Transport {
 	case "stdio":
-		log.Println("AKS MCP version:", version.GetVersion())
 		log.Println("Listening for requests on STDIO...")
 		return server.ServeStdio(s.mcpServer)
 	case "sse":
