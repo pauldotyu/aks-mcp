@@ -397,18 +397,6 @@ func BenchmarkServiceInitialization(b *testing.B) {
 
 // TestCreateCustomHTTPServerWithHelp404 tests the custom HTTP server creation for streamable-http transport
 func TestCreateCustomHTTPServerWithHelp404(t *testing.T) {
-	// Set test environment variables
-	_ = os.Setenv("AZURE_TENANT_ID", "test-tenant")
-	_ = os.Setenv("AZURE_CLIENT_ID", "test-client")
-	_ = os.Setenv("AZURE_CLIENT_SECRET", "test-secret")
-	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "test-subscription")
-	defer func() {
-		_ = os.Unsetenv("AZURE_TENANT_ID")
-		_ = os.Unsetenv("AZURE_CLIENT_ID")
-		_ = os.Unsetenv("AZURE_CLIENT_SECRET")
-		_ = os.Unsetenv("AZURE_SUBSCRIPTION_ID")
-	}()
-
 	cfg := createTestConfig("readonly", map[string]bool{})
 	service := NewService(cfg)
 	err := service.Initialize()
@@ -505,18 +493,6 @@ func TestCreateCustomHTTPServerWithHelp404(t *testing.T) {
 
 // TestCreateCustomSSEServerWithHelp404 tests the custom HTTP server creation for SSE transport
 func TestCreateCustomSSEServerWithHelp404(t *testing.T) {
-	// Set test environment variables
-	_ = os.Setenv("AZURE_TENANT_ID", "test-tenant")
-	_ = os.Setenv("AZURE_CLIENT_ID", "test-client")
-	_ = os.Setenv("AZURE_CLIENT_SECRET", "test-secret")
-	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "test-subscription")
-	defer func() {
-		_ = os.Unsetenv("AZURE_TENANT_ID")
-		_ = os.Unsetenv("AZURE_CLIENT_ID")
-		_ = os.Unsetenv("AZURE_CLIENT_SECRET")
-		_ = os.Unsetenv("AZURE_SUBSCRIPTION_ID")
-	}()
-
 	cfg := createTestConfig("readonly", map[string]bool{})
 	service := NewService(cfg)
 	err := service.Initialize()
@@ -633,18 +609,6 @@ func TestCreateCustomSSEServerWithHelp404(t *testing.T) {
 
 // TestSSEServerEndpointsAccessible tests that SSE endpoints are still accessible
 func TestSSEServerEndpointsAccessible(t *testing.T) {
-	// Set test environment variables
-	_ = os.Setenv("AZURE_TENANT_ID", "test-tenant")
-	_ = os.Setenv("AZURE_CLIENT_ID", "test-client")
-	_ = os.Setenv("AZURE_CLIENT_SECRET", "test-secret")
-	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "test-subscription")
-	defer func() {
-		_ = os.Unsetenv("AZURE_TENANT_ID")
-		_ = os.Unsetenv("AZURE_CLIENT_ID")
-		_ = os.Unsetenv("AZURE_CLIENT_SECRET")
-		_ = os.Unsetenv("AZURE_SUBSCRIPTION_ID")
-	}()
-
 	cfg := createTestConfig("readonly", map[string]bool{})
 	service := NewService(cfg)
 	err := service.Initialize()
@@ -708,18 +672,6 @@ func TestSSEServerEndpointsAccessible(t *testing.T) {
 
 // TestJSONResponseFormat tests the format of JSON error responses
 func TestJSONResponseFormat(t *testing.T) {
-	// Set test environment variables
-	_ = os.Setenv("AZURE_TENANT_ID", "test-tenant")
-	_ = os.Setenv("AZURE_CLIENT_ID", "test-client")
-	_ = os.Setenv("AZURE_CLIENT_SECRET", "test-secret")
-	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "test-subscription")
-	defer func() {
-		_ = os.Unsetenv("AZURE_TENANT_ID")
-		_ = os.Unsetenv("AZURE_CLIENT_ID")
-		_ = os.Unsetenv("AZURE_CLIENT_SECRET")
-		_ = os.Unsetenv("AZURE_SUBSCRIPTION_ID")
-	}()
-
 	cfg := createTestConfig("readonly", map[string]bool{})
 	service := NewService(cfg)
 	err := service.Initialize()
