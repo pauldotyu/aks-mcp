@@ -1,12 +1,17 @@
 package server
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/Azure/aks-mcp/internal/components/azaks"
 	"github.com/Azure/aks-mcp/internal/config"
 	"github.com/Azure/mcp-kubernetes/pkg/kubectl"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // MockToolCounter tracks registered tools for testing
@@ -368,5 +373,416 @@ func BenchmarkServiceInitialization(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Initialize failed: %v", err)
 		}
+	}
+}
+
+// TestCreateCustomHTTPServerWithHelp404 tests the custom HTTP server creation for streamable-http transport
+func TestCreateCustomHTTPServerWithHelp404(t *testing.T) {
+	// Set test environment variables
+	_ = os.Setenv("AZURE_TENANT_ID", "test-tenant")
+	_ = os.Setenv("AZURE_CLIENT_ID", "test-client")
+	_ = os.Setenv("AZURE_CLIENT_SECRET", "test-secret")
+	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "test-subscription")
+	defer func() {
+		_ = os.Unsetenv("AZURE_TENANT_ID")
+		_ = os.Unsetenv("AZURE_CLIENT_ID")
+		_ = os.Unsetenv("AZURE_CLIENT_SECRET")
+		_ = os.Unsetenv("AZURE_SUBSCRIPTION_ID")
+	}()
+
+	cfg := createTestConfig("readonly", map[string]bool{})
+	service := NewService(cfg)
+	err := service.Initialize()
+	if err != nil {
+		t.Fatalf("Failed to initialize service: %v", err)
+	}
+
+	// Test server creation
+	addr := "localhost:8080"
+	customServer := service.createCustomHTTPServerWithHelp404(addr)
+
+	if customServer == nil {
+		t.Fatal("Custom server should not be nil")
+	}
+
+	if customServer.Addr != addr {
+		t.Errorf("Expected server address %s, got %s", addr, customServer.Addr)
+	}
+
+	if customServer.Handler == nil {
+		t.Fatal("Custom server handler should not be nil")
+	}
+
+	// Test the 404 response for non-MCP paths
+	testCases := []struct {
+		path                string
+		method              string
+		expectedStatusCode  int
+		expectedContentType string
+		description         string
+	}{
+		{"/", "GET", http.StatusNotFound, "application/json", "root path should return helpful 404"},
+		{"/invalid", "GET", http.StatusNotFound, "application/json", "invalid path should return helpful 404"},
+		{"/api", "POST", http.StatusNotFound, "application/json", "non-MCP path should return helpful 404"},
+		{"/health", "GET", http.StatusNotFound, "application/json", "health path should return helpful 404"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			req, err := http.NewRequest(tc.method, tc.path, nil)
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+
+			rr := httptest.NewRecorder()
+			customServer.Handler.ServeHTTP(rr, req)
+
+			if rr.Code != tc.expectedStatusCode {
+				t.Errorf("Expected status code %d, got %d", tc.expectedStatusCode, rr.Code)
+			}
+
+			contentType := rr.Header().Get("Content-Type")
+			if contentType != tc.expectedContentType {
+				t.Errorf("Expected content type %s, got %s", tc.expectedContentType, contentType)
+			}
+
+			// Parse and validate JSON response
+			var response map[string]interface{}
+			err = json.Unmarshal(rr.Body.Bytes(), &response)
+			if err != nil {
+				t.Fatalf("Failed to parse JSON response: %v", err)
+			}
+
+			// Check required fields
+			if response["error"] != "Not Found" {
+				t.Errorf("Expected error 'Not Found', got %v", response["error"])
+			}
+
+			message, ok := response["message"].(string)
+			if !ok {
+				t.Fatal("Message field should be a string")
+			}
+			if !strings.Contains(message, "MCP") {
+				t.Error("Message should mention MCP")
+			}
+			if !strings.Contains(message, "/mcp") {
+				t.Error("Message should mention /mcp endpoint")
+			}
+
+			endpoints, ok := response["endpoints"].(map[string]interface{})
+			if !ok {
+				t.Fatal("Endpoints field should be a map")
+			}
+
+			expectedEndpoints := []string{"initialize", "requests", "listen", "terminate"}
+			for _, endpoint := range expectedEndpoints {
+				if _, exists := endpoints[endpoint]; !exists {
+					t.Errorf("Expected endpoint %s not found in response", endpoint)
+				}
+			}
+		})
+	}
+}
+
+// TestCreateCustomSSEServerWithHelp404 tests the custom HTTP server creation for SSE transport
+func TestCreateCustomSSEServerWithHelp404(t *testing.T) {
+	// Set test environment variables
+	_ = os.Setenv("AZURE_TENANT_ID", "test-tenant")
+	_ = os.Setenv("AZURE_CLIENT_ID", "test-client")
+	_ = os.Setenv("AZURE_CLIENT_SECRET", "test-secret")
+	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "test-subscription")
+	defer func() {
+		_ = os.Unsetenv("AZURE_TENANT_ID")
+		_ = os.Unsetenv("AZURE_CLIENT_ID")
+		_ = os.Unsetenv("AZURE_CLIENT_SECRET")
+		_ = os.Unsetenv("AZURE_SUBSCRIPTION_ID")
+	}()
+
+	cfg := createTestConfig("readonly", map[string]bool{})
+	service := NewService(cfg)
+	err := service.Initialize()
+	if err != nil {
+		t.Fatalf("Failed to initialize service: %v", err)
+	}
+
+	// Create SSE server
+	sseServer := server.NewSSEServer(service.mcpServer)
+
+	// Test custom server creation
+	addr := "localhost:8081"
+	customServer := service.createCustomSSEServerWithHelp404(sseServer, addr)
+
+	if customServer == nil {
+		t.Fatal("Custom SSE server should not be nil")
+	}
+
+	if customServer.Addr != addr {
+		t.Errorf("Expected server address %s, got %s", addr, customServer.Addr)
+	}
+
+	if customServer.Handler == nil {
+		t.Fatal("Custom SSE server handler should not be nil")
+	}
+
+	// Test the 404 response for non-SSE paths
+	testCases := []struct {
+		path                string
+		method              string
+		expectedStatusCode  int
+		expectedContentType string
+		description         string
+	}{
+		{"/", "GET", http.StatusNotFound, "application/json", "root path should return helpful 404"},
+		{"/invalid", "GET", http.StatusNotFound, "application/json", "invalid path should return helpful 404"},
+		{"/api", "POST", http.StatusNotFound, "application/json", "non-SSE path should return helpful 404"},
+		{"/health", "GET", http.StatusNotFound, "application/json", "health path should return helpful 404"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			req, err := http.NewRequest(tc.method, tc.path, nil)
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+
+			rr := httptest.NewRecorder()
+			customServer.Handler.ServeHTTP(rr, req)
+
+			if rr.Code != tc.expectedStatusCode {
+				t.Errorf("Expected status code %d, got %d", tc.expectedStatusCode, rr.Code)
+			}
+
+			contentType := rr.Header().Get("Content-Type")
+			if contentType != tc.expectedContentType {
+				t.Errorf("Expected content type %s, got %s", tc.expectedContentType, contentType)
+			}
+
+			// Parse and validate JSON response
+			var response map[string]interface{}
+			err = json.Unmarshal(rr.Body.Bytes(), &response)
+			if err != nil {
+				t.Fatalf("Failed to parse JSON response: %v", err)
+			}
+
+			// Check required fields
+			if response["error"] != "Not Found" {
+				t.Errorf("Expected error 'Not Found', got %v", response["error"])
+			}
+
+			message, ok := response["message"].(string)
+			if !ok {
+				t.Fatal("Message field should be a string")
+			}
+			if !strings.Contains(message, "MCP") {
+				t.Error("Message should mention MCP")
+			}
+			if !strings.Contains(message, "SSE") {
+				t.Error("Message should mention SSE transport")
+			}
+
+			endpoints, ok := response["endpoints"].(map[string]interface{})
+			if !ok {
+				t.Fatal("Endpoints field should be a map")
+			}
+
+			expectedEndpoints := []string{"sse", "message"}
+			for _, endpoint := range expectedEndpoints {
+				if _, exists := endpoints[endpoint]; !exists {
+					t.Errorf("Expected endpoint %s not found in response", endpoint)
+				}
+			}
+
+			// Verify SSE-specific endpoint descriptions
+			sseEndpoint, ok := endpoints["sse"].(string)
+			if !ok {
+				t.Fatal("SSE endpoint description should be a string")
+			}
+			if !strings.Contains(sseEndpoint, "GET /sse") {
+				t.Error("SSE endpoint should mention GET /sse")
+			}
+
+			messageEndpoint, ok := endpoints["message"].(string)
+			if !ok {
+				t.Fatal("Message endpoint description should be a string")
+			}
+			if !strings.Contains(messageEndpoint, "POST /message") {
+				t.Error("Message endpoint should mention POST /message")
+			}
+		})
+	}
+}
+
+// TestSSEServerEndpointsAccessible tests that SSE endpoints are still accessible
+func TestSSEServerEndpointsAccessible(t *testing.T) {
+	// Set test environment variables
+	_ = os.Setenv("AZURE_TENANT_ID", "test-tenant")
+	_ = os.Setenv("AZURE_CLIENT_ID", "test-client")
+	_ = os.Setenv("AZURE_CLIENT_SECRET", "test-secret")
+	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "test-subscription")
+	defer func() {
+		_ = os.Unsetenv("AZURE_TENANT_ID")
+		_ = os.Unsetenv("AZURE_CLIENT_ID")
+		_ = os.Unsetenv("AZURE_CLIENT_SECRET")
+		_ = os.Unsetenv("AZURE_SUBSCRIPTION_ID")
+	}()
+
+	cfg := createTestConfig("readonly", map[string]bool{})
+	service := NewService(cfg)
+	err := service.Initialize()
+	if err != nil {
+		t.Fatalf("Failed to initialize service: %v", err)
+	}
+
+	// Create SSE server
+	sseServer := server.NewSSEServer(service.mcpServer)
+
+	// Test custom server creation
+	addr := "localhost:8082"
+	customServer := service.createCustomSSEServerWithHelp404(sseServer, addr)
+
+	// Test that SSE endpoints are accessible (don't return our custom 404)
+	// Note: We only test that they don't return our custom 404 response,
+	// not the actual SSE functionality which would require persistent connections
+	testCases := []struct {
+		path        string
+		method      string
+		shouldBe404 bool
+		description string
+	}{
+		{"/message", "POST", false, "Message endpoint should be handled by SSE server"},
+		{"/message", "GET", false, "Message endpoint with GET should be handled by SSE server"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			req, err := http.NewRequest(tc.method, tc.path, nil)
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+
+			rr := httptest.NewRecorder()
+			customServer.Handler.ServeHTTP(rr, req)
+
+			if tc.shouldBe404 {
+				if rr.Code != http.StatusNotFound {
+					t.Errorf("Expected 404 for %s %s, got %d", tc.method, tc.path, rr.Code)
+				}
+			} else {
+				if rr.Code == http.StatusNotFound {
+					t.Errorf("Should not get 404 for %s %s, but got %d", tc.method, tc.path, rr.Code)
+				}
+				// Additional check: ensure it's not our custom 404 JSON response
+				if rr.Header().Get("Content-Type") == "application/json" {
+					var response map[string]interface{}
+					if json.Unmarshal(rr.Body.Bytes(), &response) == nil {
+						if response["error"] == "Not Found" && strings.Contains(response["message"].(string), "SSE transport") {
+							t.Errorf("Got our custom 404 response for %s %s, should be handled by SSE server", tc.method, tc.path)
+						}
+					}
+				}
+				// Note: We don't check for specific success codes since the SSE server
+				// may return various codes based on the request content/headers
+			}
+		})
+	}
+}
+
+// TestJSONResponseFormat tests the format of JSON error responses
+func TestJSONResponseFormat(t *testing.T) {
+	// Set test environment variables
+	_ = os.Setenv("AZURE_TENANT_ID", "test-tenant")
+	_ = os.Setenv("AZURE_CLIENT_ID", "test-client")
+	_ = os.Setenv("AZURE_CLIENT_SECRET", "test-secret")
+	_ = os.Setenv("AZURE_SUBSCRIPTION_ID", "test-subscription")
+	defer func() {
+		_ = os.Unsetenv("AZURE_TENANT_ID")
+		_ = os.Unsetenv("AZURE_CLIENT_ID")
+		_ = os.Unsetenv("AZURE_CLIENT_SECRET")
+		_ = os.Unsetenv("AZURE_SUBSCRIPTION_ID")
+	}()
+
+	cfg := createTestConfig("readonly", map[string]bool{})
+	service := NewService(cfg)
+	err := service.Initialize()
+	if err != nil {
+		t.Fatalf("Failed to initialize service: %v", err)
+	}
+
+	tests := []struct {
+		name          string
+		serverFunc    func() *http.Server
+		expectedKeys  []string
+		transportType string
+	}{
+		{
+			name: "StreamableHTTP_JSONFormat",
+			serverFunc: func() *http.Server {
+				return service.createCustomHTTPServerWithHelp404("localhost:8080")
+			},
+			expectedKeys:  []string{"error", "message", "endpoints"},
+			transportType: "streamable-http",
+		},
+		{
+			name: "SSE_JSONFormat",
+			serverFunc: func() *http.Server {
+				sseServer := server.NewSSEServer(service.mcpServer)
+				return service.createCustomSSEServerWithHelp404(sseServer, "localhost:8081")
+			},
+			expectedKeys:  []string{"error", "message", "endpoints"},
+			transportType: "sse",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			customServer := tt.serverFunc()
+
+			req, err := http.NewRequest("GET", "/invalid", nil)
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+
+			rr := httptest.NewRecorder()
+			customServer.Handler.ServeHTTP(rr, req)
+
+			// Verify it's valid JSON
+			var response map[string]interface{}
+			err = json.Unmarshal(rr.Body.Bytes(), &response)
+			if err != nil {
+				t.Fatalf("Response should be valid JSON: %v", err)
+			}
+
+			// Verify all expected keys are present
+			for _, key := range tt.expectedKeys {
+				if _, exists := response[key]; !exists {
+					t.Errorf("Expected key '%s' not found in response", key)
+				}
+			}
+
+			// Verify error field value
+			if response["error"] != "Not Found" {
+				t.Errorf("Expected error field to be 'Not Found', got %v", response["error"])
+			}
+
+			// Verify message is informative
+			message, ok := response["message"].(string)
+			if !ok {
+				t.Fatal("Message should be a string")
+			}
+			if len(message) < 20 {
+				t.Error("Message should be informative (at least 20 characters)")
+			}
+
+			// Verify endpoints structure
+			endpoints, ok := response["endpoints"].(map[string]interface{})
+			if !ok {
+				t.Fatal("Endpoints should be a map")
+			}
+			if len(endpoints) == 0 {
+				t.Error("Endpoints map should not be empty")
+			}
+
+			t.Logf("Verified JSON format for %s transport", tt.transportType)
+		})
 	}
 }
