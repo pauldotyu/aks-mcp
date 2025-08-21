@@ -193,26 +193,3 @@ func BenchmarkConvertConfig(b *testing.B) {
 		_ = ConvertConfig(in)
 	}
 }
-
-// BenchmarkExecutorAdapter measures adapter overhead to ensure delegation
-// stays cheap and doesn’t become a bottleneck as layers evolve.
-func BenchmarkExecutorAdapter(b *testing.B) {
-	fe := &fakeExecutor{out: "ok"}
-	adapter := WrapK8sExecutor(fe)
-	inCfg := &config.ConfigData{
-		Timeout:         42,
-		Transport:       "stdio",
-		Host:            "127.0.0.1",
-		Port:            8000,
-		AccessLevel:     "readonly",
-		AdditionalTools: map[string]bool{"helm": true},
-		AllowNamespaces: "default",
-	}
-
-	params := map[string]interface{}{"k": "v"}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = adapter.Execute(params, inCfg)
-	}
-}
