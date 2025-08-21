@@ -11,8 +11,10 @@ import (
 	k8stools "github.com/Azure/mcp-kubernetes/pkg/tools"
 )
 
+var benchOut *k8sconfig.ConfigData
+
 // This test suite verifies config mapping (without mutating input), adapter delegation,
-// error propagation, and the current nil-config behavior. Benchmarks provide a baseline
+// error propagation, and current nil-config behavior. The benchmark provides a baseline
 // for detecting performance regressions.
 
 // mustEqual keeps assertions concise with consistent failure messages.
@@ -102,15 +104,48 @@ func TestConvertConfig_DoesNotMutateInput(t *testing.T) {
 		orig.AdditionalTools[k] = v
 	}
 
-	_ = ConvertConfig(in)
+	out := ConvertConfig(in)
 	mustDeepEqual(t, in, &orig, "input should remain unchanged")
+
+	if out == nil || out.SecurityConfig == nil {
+		t.Fatalf("expected non-nil output and SecurityConfig, got %#v", out)
+	}
+
+	mustEqual(t, out.Timeout, in.Timeout, "Timeout")
+	mustEqual(t, out.Transport, in.Transport, "Transport")
+	mustEqual(t, out.Host, in.Host, "Host")
+	mustEqual(t, out.Port, in.Port, "Port")
+	mustEqual(t, out.AccessLevel, in.AccessLevel, "AccessLevel")
+	mustEqual(t, out.OTLPEndpoint, in.OTLPEndpoint, "OTLPEndpoint")
+	mustEqual(t, out.AllowNamespaces, in.AllowNamespaces, "AllowNamespaces")
+	mustDeepEqual(t, out.AdditionalTools, in.AdditionalTools, "AdditionalTools")
+	mustEqual(t, out.SecurityConfig.AccessLevel, k8ssecurity.AccessLevel(in.AccessLevel), "SecurityConfig.AccessLevel")
 }
 
 func TestConvertConfig_ZeroValueCfg(t *testing.T) {
 	t.Parallel()
-	// Zero-value config should be accepted (no panic).
+
+	// Document current behavior when callers pass an uninitialized config.
 	in := &config.ConfigData{}
-	_ = ConvertConfig(in)
+	orig := *in
+
+	out := ConvertConfig(in)
+
+	mustDeepEqual(t, in, &orig, "input unchanged")
+
+	if out == nil || out.SecurityConfig == nil {
+		t.Fatalf("non-nil out and SecurityConfig required, got %#v", out)
+	}
+
+	mustEqual(t, out.Timeout, 0, "Timeout")
+	mustEqual(t, out.Transport, "", "Transport")
+	mustEqual(t, out.Host, "", "Host")
+	mustEqual(t, out.Port, 0, "Port")
+	mustEqual(t, out.AccessLevel, "", "AccessLevel")
+	mustEqual(t, out.OTLPEndpoint, "", "OTLPEndpoint")
+	mustEqual(t, out.AllowNamespaces, "", "AllowNamespaces")
+	mustDeepEqual(t, out.AdditionalTools, map[string]bool(nil), "AdditionalTools")
+	mustEqual(t, out.SecurityConfig.AccessLevel, k8ssecurity.AccessLevel(""), "SecurityConfig.AccessLevel")
 }
 
 func TestExecutorAdapter_DelegatesAndForwards(t *testing.T) {
@@ -134,12 +169,14 @@ func TestExecutorAdapter_DelegatesAndForwards(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	mustEqual(t, got, "ok", "adapter output")
 	mustDeepEqual(t, fe.lastParams, params, "params forwarded")
 
 	if fe.lastCfg == nil || fe.lastCfg.SecurityConfig == nil {
 		t.Fatalf("expected non-nil converted cfg + SecurityConfig, got %#v", fe.lastCfg)
 	}
+
 	mustEqual(t, fe.lastCfg.Port, inCfg.Port, "Port")
 	mustEqual(t, fe.lastCfg.AccessLevel, inCfg.AccessLevel, "AccessLevel")
 	mustDeepEqual(t, fe.lastCfg.AdditionalTools, inCfg.AdditionalTools, "AdditionalTools")
@@ -190,6 +227,6 @@ func BenchmarkConvertConfig(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = ConvertConfig(in)
+		benchOut = ConvertConfig(in)
 	}
 }
