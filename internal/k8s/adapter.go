@@ -1,3 +1,6 @@
+// Package k8s provides adapters that let aks-mcp interoperate with the
+// mcp-kubernetes libraries. It maps aks-mcp configuration and executors
+// to the types expected by mcp-kubernetes without altering behavior.
 package k8s
 
 import (
@@ -9,16 +12,13 @@ import (
 	k8stools "github.com/Azure/mcp-kubernetes/pkg/tools"
 )
 
-// ConfigAdapter converts aks-mcp config to mcp-kubernetes config
+// ConvertConfig maps an aks-mcp ConfigData into the equivalent
+// mcp-kubernetes ConfigData without mutating the input.
 func ConvertConfig(cfg *config.ConfigData) *k8sconfig.ConfigData {
-	// Create K8s security config
 	k8sSecurityConfig := k8ssecurity.NewSecurityConfig()
-
-	// Map allowed namespaces
 	k8sSecurityConfig.SetAllowedNamespaces(cfg.AllowNamespaces)
 	k8sSecurityConfig.AccessLevel = k8ssecurity.AccessLevel(cfg.AccessLevel)
 
-	// Create K8s config
 	k8sCfg := &k8sconfig.ConfigData{
 		AdditionalTools:  cfg.AdditionalTools,
 		Timeout:          cfg.Timeout,
@@ -35,20 +35,21 @@ func ConvertConfig(cfg *config.ConfigData) *k8sconfig.ConfigData {
 	return k8sCfg
 }
 
-// WrapK8sExecutor wraps a mcp-kubernetes executor to work with aks-mcp config
+// WrapK8sExecutor makes an mcp-kubernetes CommandExecutor
+// compatible with the aks-mcp tools.CommandExecutor interface.
 func WrapK8sExecutor(k8sExecutor k8stools.CommandExecutor) tools.CommandExecutor {
 	return &executorAdapter{k8sExecutor: k8sExecutor}
 }
 
-// executorAdapter adapts between aks-mcp and mcp-kubernetes configs
+// executorAdapter bridges aks-mcp execution to mcp-kubernetes.
+// Unexported; behavior is defined by the wrapped executor.
 type executorAdapter struct {
 	k8sExecutor k8stools.CommandExecutor
 }
 
+// Execute adapts aks-mcp execution by converting its config
+// and delegating to the wrapped mcp-kubernetes executor.
 func (a *executorAdapter) Execute(params map[string]interface{}, cfg *config.ConfigData) (string, error) {
-	// Convert aks-mcp config to k8s config
 	k8sCfg := ConvertConfig(cfg)
-
-	// Execute using the k8s executor
 	return a.k8sExecutor.Execute(params, k8sCfg)
 }
