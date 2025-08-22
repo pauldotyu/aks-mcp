@@ -93,7 +93,7 @@ func handleRunAction(ctx context.Context, mgr GadgetManager, actionParams map[st
 
 	gadget, ok := getGadgetByName(gadgetName)
 	if !ok {
-		return "", fmt.Errorf("invalid or unsupported gadget name: %s", gadgetName)
+		return "", fmt.Errorf("invalid or unsupported gadget name: %s: expected one of %v", gadgetName, getGadgetNames())
 	}
 
 	duration, ok := actionParams["duration"].(float64)
@@ -132,7 +132,7 @@ func handleStartAction(ctx context.Context, mgr GadgetManager, actionParams map[
 
 	gadget, ok := getGadgetByName(gadgetName)
 	if !ok {
-		return "", fmt.Errorf("invalid or unsupported gadget name: %s", gadgetName)
+		return "", fmt.Errorf("invalid or unsupported gadget name: %s: expected one of %v", gadgetName, getGadgetNames())
 	}
 
 	// TODO: Use GetGadgetInfo to validate gadgetParams to ensure compatibility with different gadget versions

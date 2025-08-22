@@ -1,6 +1,9 @@
 package inspektorgadget
 
-import "github.com/mark3labs/mcp-go/mcp"
+import (
+	"github.com/mark3labs/mcp-go/mcp"
+	"strings"
+)
 
 // =============================================================================
 // Inspektor Gadget related Tool Registrations
@@ -10,15 +13,27 @@ import "github.com/mark3labs/mcp-go/mcp"
 func RegisterInspektorGadgetTool() mcp.Tool {
 	return mcp.NewTool(
 		"inspektor_gadget_observability",
-		mcp.WithDescription("Real-time observability tool for Azure Kubernetes Service (AKS) clusters, allowing users to manage gadgets for monitoring and debugging"),
+		mcp.WithDescription("Real-time observability tool for Azure Kubernetes Service (AKS) clusters, allowing users to manage gadgets for monitoring and debugging\n\n"+
+			"Apart from 'action' param:\n\n"+
+			"It supports 'action_params' (type=object) to specify parameters for the action."+
+			"Available params are: "+
+			"gadget_name, duration, gadget_id, chart_version. "+
+			"Available Gadget names are: "+strings.Join(getGadgetNames(), ", ")+". "+
+			"Example: "+
+			"{'action': 'run', 'action_params': {'gadget_name': 'observe_dns', 'duration': 10}}\n\n"+
+			"It supports 'filter_params' (type=object) to filter the data captured by the gadget. "+
+			"Available params are: "+
+			"namespace, pod, container, selector,"+strings.Join(getGadgetParamsKeys(), ", ")+". "+
+			"Example: "+
+			"{'action': 'run', 'filter_params': {'namespace': 'default', 'selector': 'app=myapp', 'observe_dns.unsuccessful_only': true}}"),
 		mcp.WithString("action",
 			mcp.Required(),
 			mcp.Description("Action to perform on the gadget: "+
 				runAction+" to run a gadget for a specific duration, "+
 				startAction+" to start a gadget for continuous observation, "+
-				stopAction+" to stop a running gadget, "+
-				getResultsAction+" to retrieve results of a gadget run (only available before stopping the gadget), "+
-				listGadgetsAction+" to list all running gadgets"+
+				stopAction+" to stop a running gadget using gadget_id, "+
+				getResultsAction+" to retrieve results of a gadget run using gadget_id (only available before stopping the gadget), "+
+				listGadgetsAction+" to list all running (not available) gadgets"+
 				deployAction+" to deploy Inspektor Gadget, "+
 				undeployAction+" to undeploy Inspektor Gadget"+
 				upgradeAction+" to upgrade Inspektor Gadget, "+
